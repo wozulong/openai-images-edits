@@ -2,7 +2,7 @@
 旨在打造一个使用 OpenAI 图片编辑API（或Chat2API）来让AI编辑图片的服务。
 
 #### 使用官方API：https://platform.openai.com/docs/api-reference/images/createEdit
-#### 或者使用Chat2API：https://api.oaifree.com/v1/images/edits [介绍](https://linux.do/t/topic/50789)
+#### 或者使用Chat2API：https://api.oaifree.com/v1/images/edits -> [【相关介绍】](https://linux.do/t/topic/50789)
 
 去编辑一张几乎任意的图片（需要遵循限制的宽高）。
 
