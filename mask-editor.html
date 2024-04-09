@@ -2,21 +2,396 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Mask Creator</title>
+    <script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
+    <style>
+
+        :root {
+            --menu-height: 50px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #image-container {
+            cursor: pointer;
+            border: 2px dashed #ccc;
+            padding: 10px;
+            width: 300px;
+            height: 200px;
+            text-align: center;
+            line-height: 200px;
+        }
+
+        #image-container.over {
+            border-color: #000;
+        }
+
+        .upload-hint {
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* 非前缀版本，Chrome和Opera等 */
+            cursor: pointer;
+            font-size: 18px;
+            color: #999;
+        }
+
+        .image-item {
+            padding: 5px;
+            position: relative; /* 使内部的绝对定位元素相对于此元素定位 */
+            border: 2px dashed #ccc; /* 可选：为了可视化 */
+            margin-top: 20px; /* 可选：如果有多个 image-item */
+            width: 310px;
+        }
+
+        .image-item-actions {
+            position: absolute; /* 绝对定位 */
+            top: 0;
+            right: 0;
+            z-index: 10; /* 确保图标位于图片之上 */
+        }
+
+        .delete-icon {
+            cursor: pointer;
+            background-color: white; /* 使图标更加显眼 */
+            border-radius: 50%; /* 圆形背景 */
+            padding: 5px; /* 内边距，根据需要调整 */
+        }
+
+        .image-item-content {
+            width: 100%; /* 占满整个容器 */
+            height: 100%; /* 占满整个容器 */
+            display: flex; /* 使用 Flexbox 以便于内容居中 */
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+        }
+
+        .image-item-content img {
+            max-width: 300px; /* 保证图片不会超出容器 */
+            max-height: 200px; /* 保证图片不会超出容器 */
+            width: 300px;
+            height: 200px;
+            image-rendering: high-quality;
+        }
+
+        #canvas-container {
+            position: fixed; /* 或 absolute，取决于你需要的布局 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            top: 0; /* 根据需要调整 */
+            display: none; /* 初始状态为隐藏 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            height: 100vh;
+            background-color: rgba(204, 204, 204, 0.9); /* 可选：增加背景色以增强可见性 */
+        }
+
+        #backgroundCanvas, #drawingCanvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            margin: auto;
+        }
+
+        #backgroundCanvas {
+            z-index: 999991;
+        }
+
+        #drawingCanvas {
+            z-index: 999992;
+        }
+
+
+        #canvas-header {
+            background-color: #f2f2f2; /* 轻灰色背景 */
+            width: 100%; /* 头部宽度占满容器宽度 */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 下方阴影，增加立体感 */
+            position: absolute;
+            margin-top: 10px;
+            top: 0;
+        }
+
+        #menu {
+            display: flex;
+            gap: 10px; /* 按钮之间的间隙 */
+            justify-content: center;
+            flex-wrap: nowrap;
+            align-items: center;
+            height: var(--menu-height);
+        }
+
+        #menu button {
+            padding: 10px 20px; /* 按钮内边距 */
+            border: none; /* 移除边框 */
+            border-radius: 5px; /* 轻微的圆角 */
+            color: white; /* 文字颜色 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+            transition: background-color 0.3s; /* 平滑的背景颜色过渡效果 */
+        }
+
+        #menu button:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #menu button:active {
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #undo {
+            background-color: #0000ff; /* 亮蓝色 */
+            color: white;
+        }
+
+        #clear {
+            background-color: #e74c3c; /* 亮红色 */
+            color: white;
+        }
+
+        #close {
+            background-color: #2ecc71; /* 亮绿色 */
+            color: white;
+        }
+
+        #canvas-wrapper {
+            height: calc(100vh - var(--menu-height) - 5px);
+        }
+
+    </style>
+
 </head>
 <body>
-<input type="file" id="upload" accept="image/*" />
-<button id="export">导出遮罩</button>
-<div id="canvas-container" style="position: relative;">
-    <canvas id="backgroundCanvas" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
-    <canvas id="drawingCanvas" style="position: absolute; left: 0; top: 0; z-index: 2;"></canvas>
+<input style="display: none;" type="file" id="upload" name="upload" accept="image/*"/>
+<div id="container">
+    <div id="container-header">
+        <div id="image-container">
+            <label class="upload-hint">拖放图片到此处</label>
+        </div>
+        <div id="image-wall">
+        </div>
+    </div>
+</div>
+
+<div id="canvas-container">
+    <div id="canvas-header">
+        <div id="menu">
+            <button id="undo">撤退</button>
+            <button id="clear">清除</button>
+            <button id="close">关闭</button>
+        </div>
+    </div>
+    <div id="canvas-wrapper">
+        <canvas id="backgroundCanvas"></canvas>
+        <canvas id="drawingCanvas"></canvas>
+    </div>
 </div>
 <script>
+    let imgIndex = 0;
+    $(() => {
+        let $imgContainer = $('#image-container');
+        // 阻止默认的拖放事件行为
+        $imgContainer.on('dragenter dragover dragleave drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        // 高亮显示容器
+        $imgContainer.on('dragenter dragover', function (e) {
+            $imgContainer.addClass('over');
+        });
+
+        // 取消高亮显示容器
+        $imgContainer.on('dragleave drop', function (e) {
+            $imgContainer.removeClass('over');
+        });
+
+        // 处理文件拖放
+        $imgContainer.on('drop', function (e) {
+            let files = e.originalEvent.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            $.each(files, function (i, file) {
+                displayImage(file);
+            });
+        }
+
+        function displayImage(file) {
+            if (!file.type.startsWith('image/')) {
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.onloadend = function () {
+                const imgTemplate = `
+                        <div class="image-item">
+                            <div class="image-item-actions">
+                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">×</span>
+                            </div>
+                            <div class="image-item-content">
+                                <img src="${reader.result}" alt="${file.name}" id="img-${imgIndex++}">
+                            </div>
+                         </div>
+                    `;
+                $('#image-wall').append(imgTemplate);
+            }
+            reader.readAsDataURL(file);
+        }
+
+        $('#upload').on('change', () => {
+            let files = $('#upload')[0].files;
+            handleFiles(files);
+        });
+
+        $('#image-container').on('click', function () {
+            $('#upload').click();
+        });
+
+        $('body').on('click', '.delete-icon', function () {
+            if (confirm('确认删除这张图片吗？')) {
+                const imgId = $(this).closest('.image-item .delete-icon').attr('data-img-id');
+                $(this).closest('.image-item').remove();
+                history[imgId] = []; // 清除历史记录
+            }
+        });
+
+        $('body').on('click', '.image-item-content img', function (event) {
+            const container = document.getElementById('canvas-container');
+            container.style.display = 'flex';
+            addShortKey();
+            drawImage(event.target);
+        });
+
+        $('#undo').on('click', function () {
+            undo(drawingCanvas, drawingCtx);
+        });
+
+        $('#clear').on('click', function () {
+                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                saveHistory(drawingCanvas); // 保存当前状态
+            }
+        );
+
+        $('#close').on('click', hideCanvas);
+    });
+
+    function addShortKey() {
+        document.addEventListener('keydown', (event) => {
+            // 检查是否按下了Ctrl键和Z键
+            if (event.ctrlKey && event.key === 'z') {
+                event.preventDefault(); // 阻止默认操作，比如浏览器的撤销
+                undo(drawingCanvas, drawingCtx); // 调用撤销函数
+            } else if (event.key === "Escape") {
+                event.preventDefault(); // 如果需要，也可以阻止Esc键的默认行为
+                hideCanvas(); // 调用关闭函数
+            }
+        });
+    }
+
+
+    function hideCanvas() {
+        const container = document.getElementById('canvas-container');
+        container.style.display = 'none';
+        const currentHistory = history[currentImgId];
+        // 合并两张照片
+        const mergedImg = mergeImages(currentImgId, currentHistory[currentHistory.length - 1]);
+        removeShortKey();
+    }
+
+    function mergeImages(imgId, maskUrl) {
+        const img = document.getElementById(imgId);
+        const maskImg = new Image();
+        maskImg.onload = function () {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(maskImg, 0, 0);
+            canvas.toDataURL('image/png');
+        };
+        maskImg.src = maskUrl;
+    }
+
+    function removeShortKey() {
+        document.removeEventListener('keydown', null);
+    }
+
     const backgroundCanvas = document.getElementById('backgroundCanvas');
     const drawingCanvas = document.getElementById('drawingCanvas');
     const backgroundCtx = backgroundCanvas.getContext('2d');
     const drawingCtx = drawingCanvas.getContext('2d');
     let isDrawing = false;
+    const history = []; // 存储画布历史的数组
+    let currentImgId = ''; // 当前正在编辑的图片
+
+    /**
+     * 保存当前画板状态到历史记录
+     * @param canvas 画板
+     */
+    function saveHistory(canvas) {
+        const currentHistory = history[currentImgId];
+        if (currentHistory.length > 30) { // 限制历史记录的大小
+            currentHistory.shift(); // 移除最旧的记录
+        }
+        currentHistory.push(canvas.toDataURL()); // 保存当前状态
+    }
+
+    /**
+     * 撤销上一步操作
+     * @param canvas 画板
+     * @param ctx 画板上下文
+     */
+    function undo(canvas, ctx) {
+        const currentHistory = history[currentImgId] || [];
+        if (currentHistory.length === 0) {
+            return; // 没有历史记录可供撤销
+        }
+        currentHistory.pop(); // 移除当前状态
+        let lastState = currentHistory[currentHistory.length - 1];
+        drawMask(lastState, canvas, ctx); // 绘制上一状态
+    }
+
+    function drawMask(source, canvas, ctx) {
+        let img = new Image();
+        img.onload = function () {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 清除当前画布
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // 绘制上一状态
+        };
+        if (source) {
+            img.src = source;
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 如果没有上一状态，清除画布
+        }
+    }
+
+    function drawImage(targetImg) {
+        const img = new Image();
+        img.onload = function () {
+            // 调整画布大小 等于 图片大小
+            initializeCanvas(img.width, img.height);
+            backgroundCtx.drawImage(img, 0, 0, img.width, img.height);
+            // 如果有历史记录，则恢复到最后一次状态
+            const currentHistory = history[currentImgId];
+            const lastState = currentHistory[currentHistory.length - 1];
+            drawMask(lastState, drawingCanvas, drawingCtx);
+        };
+        img.src = targetImg.src;
+        currentImgId = targetImg.id;
+        if (!history[currentImgId]) {
+            history[currentImgId] = [];
+        }
+    }
 
     function initializeCanvas(width, height) {
         backgroundCanvas.width = width;
@@ -44,6 +419,7 @@
         drawingCtx.stroke();
         drawingCtx.beginPath();
         drawingCtx.moveTo(x, y);
+        saveHistory(drawingCanvas);
     }
 
     function stopDrawing() {
@@ -72,43 +448,11 @@
         link.click();
     }
 
-
-    function handleFileSelect(e) {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                // 检查图片尺寸
-                const validSizes = [
-                    { width: 1024, height: 1024 },
-                    { width: 1792, height: 1024 },
-                    { width: 1024, height: 1792 }
-                ];
-                const isValidSize = validSizes.some(size => img.width === size.width && img.height === size.height);
-
-                if (!isValidSize) {
-                    // 如果尺寸不匹配，显示错误消息并退出
-                    alert("错误: 图片尺寸必须是 1024x1024, 1792x1024, 或 1024x1792。");
-                    return; // 停止执行函数
-                }
-
-                // 尺寸符合，初始化canvas并绘制图片
-                initializeCanvas(img.width, img.height);
-                backgroundCtx.drawImage(img, 0, 0, img.width, img.height);
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    document.getElementById('upload').addEventListener('change', handleFileSelect);
     drawingCanvas.addEventListener('mousedown', startDrawing);
     drawingCanvas.addEventListener('mousemove', draw);
     drawingCanvas.addEventListener('mouseup', stopDrawing);
     drawingCanvas.addEventListener('mouseout', stopDrawing);
-    document.getElementById('export').addEventListener('click', exportMask);
+
 
 </script>
 </body>
