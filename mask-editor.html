@@ -16,15 +16,74 @@
             padding: 0;
         }
 
-        #image-container {
-            cursor: pointer;
-            border: 2px dashed #ccc;
-            padding: 10px;
-            width: 300px;
-            height: 200px;
-            text-align: center;
-            line-height: 200px;
+        #container-header {
+            display: flex;
+            width: 100%;
+            height: 100vh;
         }
+
+        #container-aside {
+            flex-basis: 25%;
+            max-width: 25%;
+            border-right: 2px solid #ccc;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto; /* 允许滚动 */
+        }
+
+        #container-main {
+            flex-grow: 1;
+            padding: 10px;
+        }
+
+        #chat-box {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #chat-content {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        #chat-input-box {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column; /* 列布局确保toolbar和输入区域垂直排列 */
+            margin-top: auto; /* 自动调整上边距，确保贴近底部 */
+        }
+
+        #toolbar {
+            height: 10%; /* 分配高度的10%给toolbar */
+            display: flex;
+            align-items: center;
+            justify-content: start; /* 工具栏内容靠左对齐 */
+            padding: 0 10px;
+        }
+
+        #chat-input-wrapper {
+            flex-grow: 1; /* 占据剩余空间 */
+            display: flex;
+            align-items: center; /* 垂直居中输入框和按钮 */
+            padding: 0 10px;
+        }
+
+        #chat-input-text {
+            width: auto; /* 输入框自动调整宽度 */
+            flex-grow: 1; /* 输入框占据大部分空间 */
+            margin-right: 10px; /* 与发送按钮间隔 */
+        }
+
+        #chat-input-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+
 
         #image-container.over {
             border-color: #000;
@@ -165,6 +224,103 @@
             height: calc(100vh - var(--menu-height) - 5px);
         }
 
+        #container {
+            display: flex;
+            flex-direction: column;
+            width: 100%; /* 适应整个视口的宽度 */
+        }
+
+        #image-container {
+            cursor: pointer;
+            border: 2px dashed #ccc;
+            padding: 10px;
+            width: 300px; /* 给定固定宽度 */
+            min-height: 200px; /* 给定最小高度以确保与 chat-box 一样高 */
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0; /* 防止在空间不足时缩小 */
+        }
+
+        .icon-tool {
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            cursor: pointer;
+        }
+
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50%;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            z-index: 1050; /* 高于页面其他元素 */
+            display: none; /* 默认不显示，需要时通过JS控制显示 */
+        }
+
+        .modal-header {
+            padding: 10px;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #ebeef5;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            color: #303133;
+        }
+
+        .modal-close-btn {
+            float: right;
+            font-size: 20px;
+            border: none;
+            background-color: transparent;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+            font-size: 16px;
+            color: #606266;
+        }
+
+        .modal-footer {
+            padding: 10px;
+            text-align: right;
+            border-top: 1px solid #ebeef5;
+        }
+
+        .btn {
+            padding: 6px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .btn-default {
+            background-color: #dcdfe6;
+            color: #606266;
+        }
+
+        .btn-primary {
+            background-color: #409eff;
+            color: white;
+        }
+
+        /* 显示模态框时的样式 */
+        .modal-show {
+            display: block;
+        }
+
     </style>
 
 </head>
@@ -172,18 +328,63 @@
 <input style="display: none;" type="file" id="upload" name="upload" accept="image/*"/>
 <div id="container">
     <div id="container-header">
-        <div id="image-container">
-            <label class="upload-hint">拖放图片到此处</label>
+        <div id="container-aside">
+            <div id="image-container">
+                <label class="upload-hint">拖放图片到此处</label>
+            </div>
+            <div id="image-wall">
+            </div>
         </div>
-        <div id="image-wall">
+        <div id="container-main">
+            <div id="chat-box">
+                <div id="chat-content"></div>
+                <div id="chat-input-box">
+                    <div id="toolbar">
+                        <i class="icon-tool">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" data-v-ea893728="">
+                                <path fill="currentColor"
+                                      d="M764.416 254.72a351.68 351.68 0 0 1 86.336 149.184H960v192.064H850.752a351.68 351.68 0 0 1-86.336 149.312l54.72 94.72-166.272 96-54.592-94.72a352.64 352.64 0 0 1-172.48 0L371.136 936l-166.272-96 54.72-94.72a351.68 351.68 0 0 1-86.336-149.312H64v-192h109.248a351.68 351.68 0 0 1 86.336-149.312L204.8 160l166.208-96h.192l54.656 94.592a352.64 352.64 0 0 1 172.48 0L652.8 64h.128L819.2 160l-54.72 94.72zM704 499.968a192 192 0 1 0-384 0 192 192 0 0 0 384 0"></path>
+                            </svg>
+                        </i>
+                    </div>
+                    <div id="chat-input-wrapper">
+                        <label for="chat-input-text"></label>
+                        <textarea id="chat-input-text" placeholder="输入消息"></textarea>
+                        <button id="chat-input-btn">发送</button>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
+</div>
+
+<div id="modal" class="modal">
+    <div class="modal-header">
+        <span class="modal-title">使用设置</span>
+        <button class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+        <table>
+            <tr>
+                <td>
+                    <label for="openAIToken">Open AI Access token：</label>
+                </td>
+                <td>
+                    <input size="50" type="text" id="openAIToken" placeholder="输入Open AI的Access token">
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="modal-footer">
+        <button id="close-modal-btn" class="btn btn-default">取消</button>
+        <button id="save-modal-btn" class="btn btn-primary">保存</button>
     </div>
 </div>
 
 <div id="canvas-container">
     <div id="canvas-header">
         <div id="menu">
-            <button id="undo">撤退</button>
+            <button id="undo">回退</button>
             <button id="clear">清除</button>
             <button id="close">关闭</button>
         </div>
@@ -194,6 +395,7 @@
     </div>
 </div>
 <script>
+    // 图片索引
     let imgIndex = 0;
     $(() => {
         let $imgContainer = $('#image-container');
@@ -219,23 +421,30 @@
             handleFiles(files);
         });
 
+        /**
+         * 处理文件上传
+         * @param files 文件列表
+         */
         function handleFiles(files) {
             $.each(files, function (i, file) {
                 displayImage(file);
             });
         }
 
+        /**
+         * 显示图片
+         * @param file 文件对象
+         */
         function displayImage(file) {
             if (!file.type.startsWith('image/')) {
                 return;
             }
-
             let reader = new FileReader();
             reader.onloadend = function () {
                 const imgTemplate = `
                         <div class="image-item">
                             <div class="image-item-actions">
-                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">×</span>
+                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">&times;</span>
                             </div>
                             <div class="image-item-content">
                                 <img src="${reader.result}" alt="${file.name}" id="img-${imgIndex++}">
@@ -243,47 +452,172 @@
                          </div>
                     `;
                 $('#image-wall').append(imgTemplate);
+                // 保存图片数据
+                _imgList['img-' + (imgIndex - 1)] = (reader.result);
+                // 设置 .image-item-content 中的 img 为可拖拽
+                $('.image-item-content img').attr('draggable', true).on('dragstart', function (event) {
+                    // 在拖动开始时，将图片的 src 存储在 dataTransfer 对象中
+                    event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
+                });
             }
             reader.readAsDataURL(file);
         }
 
+        // 添加图片上传事件
         $('#upload').on('change', () => {
             let files = $('#upload')[0].files;
             handleFiles(files);
         });
-
+        // 图片上传事件
         $('#image-container').on('click', function () {
             $('#upload').click();
         });
-
+        // 图片删除事件
         $('body').on('click', '.delete-icon', function () {
             if (confirm('确认删除这张图片吗？')) {
                 const imgId = $(this).closest('.image-item .delete-icon').attr('data-img-id');
                 $(this).closest('.image-item').remove();
                 history[imgId] = []; // 清除历史记录
+                _imgList[imgId] = []; // 清除图片数据
             }
         });
-
+        // 图片点击事件
         $('body').on('click', '.image-item-content img', function (event) {
             const container = document.getElementById('canvas-container');
             container.style.display = 'flex';
             addShortKey();
             drawImage(event.target);
         });
-
+        // 添加撤回按钮事件
         $('#undo').on('click', function () {
             undo(drawingCanvas, drawingCtx);
         });
-
+        // 添加清除按钮事件
         $('#clear').on('click', function () {
                 drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
                 saveHistory(drawingCanvas); // 保存当前状态
             }
         );
-
+        // 关闭画布
         $('#close').on('click', hideCanvas);
+        // 隐藏模态框
+        $('.modal-close-btn, #close-modal-btn').on('click', hideModal);
+        // 显示模态框
+        $('.icon-tool').on('click', showModal);
+        // 保存设置
+        $('#save-modal-btn').on('click', function () {
+            const openAIToken = $('#openAIToken').val();
+            setLocalStorage('openAIToken', openAIToken);
+            hideModal();
+        });
+
+        // 允许 #chat-input-wrapper 接收拖拽
+        $('#chat-input-wrapper').on('dragover', function (event) {
+            event.preventDefault(); // 阻止默认行为，允许放置
+        }).on('drop', function (event) {
+            // 清空输入框中的图片
+            $('#source-img, #mask-img').remove();
+            event.preventDefault(); // 阻止默认的处理方式（打开作为链接）
+            // 获取拖拽的图片 ID，并根据 ID 从 _imgList 和 history 中获取数据
+            const imgId = event.originalEvent.dataTransfer.getData('text');
+            const imageUrl = scaleImgList[imgId];
+            const imgHistory = history[imgId];
+            if (imageUrl) {
+                // 在这里处理图片，例如添加到聊天输入或显示预览
+                $('#chat-input-wrapper').append(`<img id="source-img" src="${imageUrl}" style="max-width: 50px; max-height: 50px;" />`);
+            }
+            if (imgHistory?.length > 0) {
+                const maskImageUrl = imgHistory[imgHistory.length - 1];
+                $('#chat-input-wrapper').append(`<img id="mask-img" src="${maskImageUrl}" style="max-width: 50px; max-height: 50px;" />`);
+            }
+        });
+
+        $('#chat-input-btn').on('click', () => {
+            callOpenAIEditAPI();
+        })
     });
 
+    async function getImageBlob(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // 如果图片来源于不同的域，尝试设置此属性
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                console.log(img.width, img.height);
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(resolve);
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    async function callOpenAIEditAPI() {
+        const formData = new FormData();
+        const sourceUrl = $('#source-img')?.attr('src');
+        if (!sourceUrl) {
+            alert('请先选择一张图片');
+            return;
+        }
+        const imageBlob = await getImageBlob(sourceUrl);
+        const sourceType = sourceUrl.split('.').pop();
+        formData.append('image', imageBlob, `source.${sourceType}`);
+        const maskUrl = $('#mask-img')?.attr('src');
+        if (maskUrl) {
+            const maskBlob = await getImageBlob(maskUrl);
+            const maskType = maskUrl.split('.').pop();
+            formData.append('mask', maskBlob, `mask.${maskType}`);
+        }
+        formData.append('prompt', $('#chat-input-text').val());
+        formData.append('n', 1);
+        formData.append('size', '1024x1024');
+        try {
+            const response = await fetch('https://api.oaifree.com/v1/images/edits', {
+                method: 'POST',
+                headers: {
+                    // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+                    'Authorization': 'Bearer ' + getLocalStorage('openAIToken'),
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(data);
+            // 处理响应数据...
+        } catch (error) {
+            console.error('Request failed', error);
+        }
+    }
+
+    function setLocalStorage(key, value) {
+        localStorage.setItem(key, value);
+    }
+
+    function getLocalStorage(key) {
+        return localStorage.getItem(key);
+    }
+
+    // 显示模态框函数
+    function showModal() {
+        $('#openAIToken').val(getLocalStorage('openAIToken') || '');
+        document.getElementById('modal').style.display = 'block';
+    }
+
+    // 隐藏模态框函数
+    function hideModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    /**
+     * 添加快捷键监听
+     */
     function addShortKey() {
         document.addEventListener('keydown', (event) => {
             // 检查是否按下了Ctrl键和Z键
@@ -298,31 +632,49 @@
     }
 
 
+    /**
+     * 隐藏画布
+     */
     function hideCanvas() {
         const container = document.getElementById('canvas-container');
         container.style.display = 'none';
         const currentHistory = history[currentImgId];
         // 合并两张照片
-        const mergedImg = mergeImages(currentImgId, currentHistory[currentHistory.length - 1]);
+        mergeImages(currentHistory[currentHistory.length - 1], currentImgId);
         removeShortKey();
     }
 
-    function mergeImages(imgId, maskUrl) {
-        const img = document.getElementById(imgId);
-        const maskImg = new Image();
-        maskImg.onload = function () {
+    /**
+     * 合并图片和遮罩
+     * @param maskUrl 遮罩图片的URL
+     * @param imgId 图片的ID
+     */
+    function mergeImages(maskUrl, imgId) {
+        const backgroundImg = new Image();
+        backgroundImg.onload = function () {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.drawImage(maskImg, 0, 0);
-            canvas.toDataURL('image/png');
+            canvas.width = backgroundImg.width;
+            canvas.height = backgroundImg.height;
+            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+            // 如果没有则恢复到初始状态
+            if (maskUrl) {
+                const maskImg = new Image();
+                maskImg.onload = function () {
+                    ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+                    document.getElementById(imgId).src = canvas.toDataURL('image/png');
+                };
+                maskImg.src = maskUrl;
+            } else {
+                document.getElementById(imgId).src = canvas.toDataURL('image/png');
+            }
         };
-        maskImg.src = maskUrl;
+        backgroundImg.src = _imgList[imgId];
     }
 
+    /**
+     * 移除快捷键监听
+     */
     function removeShortKey() {
         document.removeEventListener('keydown', null);
     }
@@ -333,15 +685,21 @@
     const drawingCtx = drawingCanvas.getContext('2d');
     let isDrawing = false;
     const history = []; // 存储画布历史的数组
+    const scaleImgList = [] // 存储缩放后的图片的数组
+    const _imgList = []; // 存储图片的数组
     let currentImgId = ''; // 当前正在编辑的图片
 
     /**
      * 保存当前画板状态到历史记录
      * @param canvas 画板
+     * @param items 历史记录数组
      */
-    function saveHistory(canvas) {
-        const currentHistory = history[currentImgId];
-        if (currentHistory.length > 30) { // 限制历史记录的大小
+    function saveHistory(canvas, items = history) {
+        let currentHistory = items[currentImgId];
+        if (!currentHistory) {
+            items[currentImgId] = [];
+            currentHistory = items[currentImgId];
+        } else if (currentHistory.length > 30) { // 限制历史记录的大小
             currentHistory.shift(); // 移除最旧的记录
         }
         currentHistory.push(canvas.toDataURL()); // 保存当前状态
@@ -362,6 +720,12 @@
         drawMask(lastState, canvas, ctx); // 绘制上一状态
     }
 
+    /**
+     * 绘制遮罩
+     * @param source 遮罩图片的URL
+     * @param canvas 画板
+     * @param ctx 画板上下文
+     */
     function drawMask(source, canvas, ctx) {
         let img = new Image();
         img.onload = function () {
@@ -373,26 +737,59 @@
         } else {
             ctx.clearRect(0, 0, canvas.width, canvas.height); // 如果没有上一状态，清除画布
         }
+
     }
 
+    /**
+     * 获取缩放比例
+     * @param img 图片
+     * @returns {{scaleX: number, scaleY: number}} 缩放比例
+     */
+    function getScale(img) {
+        // 获取window的宽高
+        const windowWidth = window.innerWidth * 0.85;
+        const windowHeight = window.innerHeight * 0.85;
+        // 计算缩放比例
+        const scaleX = windowWidth / img.width;
+        const scaleY = windowHeight / img.height;
+        const scale = Math.min(scaleX, scaleY);
+        return {scaleX: scale, scaleY: scale}
+    }
+
+    /**
+     * 绘制图片
+     * @param targetImg 图片对象
+     */
     function drawImage(targetImg) {
         const img = new Image();
         img.onload = function () {
-            // 调整画布大小 等于 图片大小
-            initializeCanvas(img.width, img.height);
-            backgroundCtx.drawImage(img, 0, 0, img.width, img.height);
+            const {scaleX, scaleY} = getScale(img);
+            const scaleWidth = img.width * scaleX;
+            const scaleHeight = img.height * scaleY;
+            // 调整画布大小
+            initializeCanvas(scaleWidth, scaleHeight); // 假设这个函数设置了画布的大小
+            // 进行缩放
+            backgroundCtx.drawImage(img, 0, 0, scaleWidth, scaleHeight); // 使用缩放后的尺寸绘制图像
+            // 保存缩放后的图片
+            saveHistory(backgroundCanvas, scaleImgList);
+            // 绘制遮罩
             // 如果有历史记录，则恢复到最后一次状态
             const currentHistory = history[currentImgId];
             const lastState = currentHistory[currentHistory.length - 1];
             drawMask(lastState, drawingCanvas, drawingCtx);
         };
-        img.src = targetImg.src;
         currentImgId = targetImg.id;
+        img.src = _imgList[currentImgId];
         if (!history[currentImgId]) {
             history[currentImgId] = [];
         }
     }
 
+    /**
+     * 初始化画布
+     * @param width 画布宽度
+     * @param height 画布高度
+     */
     function initializeCanvas(width, height) {
         backgroundCanvas.width = width;
         backgroundCanvas.height = height;
@@ -400,11 +797,19 @@
         drawingCanvas.height = height;
     }
 
+    /**
+     * 开始绘制
+     * @param e 鼠标事件
+     */
     function startDrawing(e) {
         isDrawing = true;
         draw(e); // 开始绘制
     }
 
+    /**
+     * 绘制
+     * @param e 鼠标事件
+     */
     function draw(e) {
         if (!isDrawing) return;
         const rect = drawingCanvas.getBoundingClientRect();
@@ -422,6 +827,9 @@
         saveHistory(drawingCanvas);
     }
 
+    /**
+     * 停止绘制
+     */
     function stopDrawing() {
         isDrawing = false;
         drawingCtx.beginPath();
