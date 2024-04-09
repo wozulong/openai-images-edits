@@ -543,13 +543,20 @@
             img.crossOrigin = 'anonymous'; // 如果图片来源于不同的域，尝试设置此属性
             img.onload = function () {
                 const canvas = document.createElement('canvas');
-                console.log(img.width, img.height);
-                canvas.width = img.width;
-                canvas.height = img.height;
+                const width = img.width;
+                const height = img.height;
+                // 计算缩放到1024宽度时的缩放比例
+                const targetScaleX = 1024 / width;
+                // 应用缩放比例到宽度和高度来保持宽高比
+                canvas.width = 1024; // 目标宽度为1024像素
+                canvas.height = height * targetScaleX; // 调整高度以保持宽高比
+                console.log(canvas.width, canvas.height);
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                // 在调整后的canvas尺寸上绘制图片
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 canvas.toBlob(resolve);
             };
+
             img.onerror = reject;
             img.src = url;
         });
