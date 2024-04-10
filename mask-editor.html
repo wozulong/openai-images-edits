@@ -321,6 +321,42 @@
             display: block;
         }
 
+
+        .chat-item {
+            background-color: #f9f9f9; /* 聊天项背景色 */
+            margin-bottom: 10px; /* 聊天项之间的间距 */
+            border-radius: 8px; /* 轻微的圆角 */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 轻微的阴影，增加立体感 */
+            padding: 15px; /* 内部间距 */
+            max-width: 80%; /* 聊天项的最大宽度 */
+            word-wrap: break-word; /* 防止内容溢出 */
+        }
+
+        .chat-item-content {
+            margin-bottom: 10px; /* 文本内容与图片之间的间距 */
+        }
+
+        .chat-image-wrapper img {
+            max-width: 300px; /* 图片的最大宽度 */
+            max-height: 270px; /* 图片的最大高度 */
+            height: auto; /* 保持图片原有比例 */
+            width: auto; /* 保持图片原有比例 */
+            border-radius: 4px; /* 图片轻微圆角 */
+            margin-right: 10px; /* 图片之间的间距 */
+        }
+
+        .chat-item-actions {
+            display: flex;
+            justify-content: flex-end; /* 删除图标靠右显示 */
+        }
+
+        .delete-icon {
+            font-size: 20px; /* 删除图标大小 */
+            color: #999; /* 图标颜色 */
+            padding: 5px; /* 方便点击 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+        }
+
     </style>
 
 </head>
@@ -533,6 +569,10 @@
         });
 
         $('#chat-input-btn').on('click', () => {
+            if (!$('#chat-input-text').val()) {
+                alert('请输入消息内容');
+                return;
+            }
             callOpenAIEditAPI();
         })
     });
@@ -543,20 +583,31 @@
             img.crossOrigin = 'anonymous'; // 如果图片来源于不同的域，尝试设置此属性
             img.onload = function () {
                 const canvas = document.createElement('canvas');
-                const width = img.width;
-                const height = img.height;
-                // 计算缩放到1024宽度时的缩放比例
-                const targetScaleX = 1024 / width;
+                const scaleX = 1024 / img.width;
+                const scaleY = 1792 / img.height;
                 // 应用缩放比例到宽度和高度来保持宽高比
-                canvas.width = 1024; // 目标宽度为1024像素
-                canvas.height = height * targetScaleX; // 调整高度以保持宽高比
-                console.log(canvas.width, canvas.height);
+                canvas.width = Math.ceil(scaleX * img.width);
+                canvas.height = Math.ceil(scaleY * img.height);
+                // 绘制图片到临时canvas
                 const ctx = canvas.getContext('2d');
-                // 在调整后的canvas尺寸上绘制图片
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // 首先，在临时canvas上绘制一个白色背景
+                ctx.fillStyle = '#ffffff'; // 白色填充
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // 检查是否需要旋转（宽度大于高度）
+                const needRotate = img.width > img.height;
+                if (needRotate) {
+                    // 将绘制的原点移动到新的中心点
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    // 旋转画布
+                    ctx.rotate(Math.PI / 2); // 旋转90度（π/2弧度）
+                    // 绘制图片，由于画布已经旋转并且原点也改变了，需要调整图片的位置
+                    ctx.drawImage(img, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+                } else {
+                    // 在调整后的canvas尺寸上绘制图片
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                }
                 canvas.toBlob(resolve);
             };
-
             img.onerror = reject;
             img.src = url;
         });
@@ -569,38 +620,95 @@
             alert('请先选择一张图片');
             return;
         }
-        const imageBlob = await getImageBlob(sourceUrl);
-        const sourceType = sourceUrl.split('.').pop();
-        formData.append('image', imageBlob, `source.${sourceType}`);
         const maskUrl = $('#mask-img')?.attr('src');
-        if (maskUrl) {
-            const maskBlob = await getImageBlob(maskUrl);
-            const maskType = maskUrl.split('.').pop();
-            formData.append('mask', maskBlob, `mask.${maskType}`);
-        }
-        formData.append('prompt', $('#chat-input-text').val());
-        formData.append('n', 1);
-        formData.append('size', '1024x1024');
-        try {
-            const response = await fetch('https://api.oaifree.com/v1/images/edits', {
+
+        // 使用 Promise.all 同步获取图片Blob
+        Promise.all([
+            sourceUrl ? getImageBlob(sourceUrl).then(blob => ({
+                blob: blob,
+                name: 'image',
+                type: sourceUrl.split('.').pop()
+            })) : Promise.resolve(null), // 如果没有 sourceUrl，返回一个解决为null的Promise
+            maskUrl ? getImageBlob(maskUrl).then(blob => ({
+                blob: blob,
+                name: 'mask',
+                type: maskUrl.split('.').pop()
+            })) : Promise.resolve(null)
+        ]).then(results => {
+            // 过滤掉任何可能的null结果，并处理每个成功的Blob获取
+            results.forEach(result => {
+                if (result) {
+                    formData.append(result.name, result.blob, `${result.name}.${result.type}`);
+                }
+            });
+            // 继续处理 formData
+            formData.append('prompt', $('#chat-input-text').val());
+            const content = $('#chat-content');
+            const message = `
+                <div class="chat-item">
+                    <div class="chat-item-content">${$('#chat-input-text').val()}</div>
+                        <div class="chat-image-wrapper">
+                            ${formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('')}
+                            ${formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('')}
+                        </div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon" style="cursor: pointer;">&times;</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            content.append(message);
+
+            formData.append('n', 1);
+            formData.append('size', '1024x1024');
+
+            fetch('https://api.oaifree.com/v1/images/edits', {
                 method: 'POST',
                 headers: {
                     // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
                     'Authorization': 'Bearer ' + getLocalStorage('openAIToken'),
                 },
                 body: formData
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                /*
+                {
+                        "created": 1712748493,
+                        "data": [
+                            {
+                                "revised_prompt": "A close-up of a human eye, showing intricate details. The eye has a vivid red color, standing out dramatically. The iris is sharply defined, with natural variations in shade and texture, resembling a normal eye but with the unique red hue. The surrounding skin and eyelashes are rendered realistically, emphasizing the contrast and highlighting the red eye as the focal point. The image should have a realistic and detailed style, capturing the beauty and intensity of the red eye.",
+                                "url": "https://files.oaifree.com/file-Ik4JxrY83kGsRcodrbmvea9I?se=2024-04-10T11%3A33%3A48Z\u0026sp=r\u0026sv=2021-08-06\u0026sr=b\u0026rscc=max-age%3D31536000%2C%20immutable\u0026rscd=attachment%3B%20filename%3Daa346b17-dc68-46a6-b971-d4eeb554703e.webp\u0026sig=Szc%2BOUhYOPLvtvJTByoeWdQ5hC8mW7FcSFLy4mDmZfk%3D"
+                            }
+                        ]
+                    }
+                 */
+                const imageUrl = data.data[0].url;
+                const content = $('#chat-content');
+                const message = `
+                    <div class="chat-item">
+                        <div class="chat-item-ai-content">DELL:</div>
+                        <div class="chat-item-content">${data.data[0].revised_prompt}</div>
+                        <div class="chat-image-wrapper">
+                            <img class="chat-item-content" src="${imageUrl}" alt="image">
+
+                        </div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon" style="cursor: pointer;">&times;</span>
+                        </div>
+                    </div>
+                `;
+                content.append(message);
+            }).catch(error => {
+                console.error('Request failed', error);
             });
+            // 这里插入发送 formData 到服务器的代码
+            // 例如： uploadData(formData);
+        }).catch(error => {
+            console.error('获取图像失败:', error);
+        });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
 
-            const data = await response.json();
-            console.log(data);
-            // 处理响应数据...
-        } catch (error) {
-            console.error('Request failed', error);
-        }
     }
 
     function setLocalStorage(key, value) {
@@ -752,14 +860,15 @@
      * @param img 图片
      * @returns {{scaleX: number, scaleY: number}} 缩放比例
      */
-    function getScale(img) {
+    function getScale(img, width, height, getMax = false) {
         // 获取window的宽高
-        const windowWidth = window.innerWidth * 0.85;
-        const windowHeight = window.innerHeight * 0.85;
+        const windowWidth = width || window.innerWidth * 0.85;
+        const windowHeight = height || window.innerHeight * 0.85;
+        console.log('getScale', windowWidth, windowHeight);
         // 计算缩放比例
         const scaleX = windowWidth / img.width;
         const scaleY = windowHeight / img.height;
-        const scale = Math.min(scaleX, scaleY);
+        const scale = getMax ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
         return {scaleX: scale, scaleY: scale}
     }
 
