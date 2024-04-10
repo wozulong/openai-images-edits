@@ -1,115 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Image Mask Creator</title>
+    <style>
+        /* 通过CSS添加一个圆形光标 */
+        #drawingCanvas {
+            border: 1px solid;
+            margin-top: 10px;
+        }
+    </style>
 </head>
+
 <body>
-<input type="file" id="upload" accept="image/*" />
-<button id="export">导出遮罩</button>
-<div id="canvas-container" style="position: relative;">
-    <canvas id="backgroundCanvas" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
-    <canvas id="drawingCanvas" style="position: absolute; left: 0; top: 0; z-index: 2;"></canvas>
-</div>
-<script>
-    const backgroundCanvas = document.getElementById('backgroundCanvas');
-    const drawingCanvas = document.getElementById('drawingCanvas');
-    const backgroundCtx = backgroundCanvas.getContext('2d');
-    const drawingCtx = drawingCanvas.getContext('2d');
-    let isDrawing = false;
+    <input type="file" id="upload" accept="image/*" />
+    <!-- <label for="brushSize">画笔大小: </label> -->
+    <button id="undo">撤回</button>
 
-    function initializeCanvas(width, height) {
-        backgroundCanvas.width = width;
-        backgroundCanvas.height = height;
-        drawingCanvas.width = width;
-        drawingCanvas.height = height;
-    }
-
-    function startDrawing(e) {
-        isDrawing = true;
-        draw(e); // 开始绘制
-    }
-
-    function draw(e) {
-        if (!isDrawing) return;
-        const rect = drawingCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        drawingCtx.lineWidth = 50; // 笔触大小
-        drawingCtx.lineCap = 'round';
-        drawingCtx.strokeStyle = 'rgba(0,0,0,0.5)'; // 灰色半透明
-
-        drawingCtx.lineTo(x, y);
-        drawingCtx.stroke();
-        drawingCtx.beginPath();
-        drawingCtx.moveTo(x, y);
-    }
-
-    function stopDrawing() {
-        isDrawing = false;
-        drawingCtx.beginPath();
-    }
-
-    function exportMask() {
-        // 创建一个新的临时canvas，用于导出
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = drawingCanvas.width;
-        tempCanvas.height = drawingCanvas.height;
-
-        // 首先，在临时canvas上绘制一个白色背景
-        tempCtx.fillStyle = '#ffffff'; // 白色填充
-        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-        // 然后，将drawingCanvas的内容绘制在白色背景上
-        tempCtx.drawImage(drawingCanvas, 0, 0);
-
-        // 导出临时canvas的内容（现在有了白色背景的遮罩）
-        const link = document.createElement('a');
-        link.download = 'mask.png';
-        link.href = tempCanvas.toDataURL('image/png');
-        link.click();
-    }
+    <input type="range" id="brushSize" min="10" max="100" value="50"> <!-- 画笔大小选择器 -->
+    <button id="export" >导出遮罩</button>
 
 
-    function handleFileSelect(e) {
-        const file = e.target.files[0];
-        const reader = new FileReader();
+    <div id="canvas-container" style="position: relative;">
+        <canvas id="backgroundCanvas" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+        <canvas id="drawingCanvas" style="position: absolute; left: 0; top: 0; z-index: 2;"></canvas>
+    </div>
+    <script>
+        const backgroundCanvas = document.getElementById('backgroundCanvas');
+        const drawingCanvas = document.getElementById('drawingCanvas');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+        const drawingCtx = drawingCanvas.getContext('2d');
+        let isDrawing = false;
+        let drawingHistory = [];
+        let brushSize = 50; // 默认画笔大小
 
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                // 检查图片尺寸
-                const validSizes = [
-                    { width: 1024, height: 1024 },
-                    { width: 1792, height: 1024 },
-                    { width: 1024, height: 1792 }
-                ];
-                const isValidSize = validSizes.some(size => img.width === size.width && img.height === size.height);
 
-                if (!isValidSize) {
-                    // 如果尺寸不匹配，显示错误消息并退出
-                    alert("错误: 图片尺寸必须是 1024x1024, 1792x1024, 或 1024x1792。");
-                    return; // 停止执行函数
-                }
+        function initializeCanvas(width, height) {
+            backgroundCanvas.width = width;
+            backgroundCanvas.height = height;
+            drawingCanvas.width = width;
+            drawingCanvas.height = height;
+        }
 
-                // 尺寸符合，初始化canvas并绘制图片
-                initializeCanvas(img.width, img.height);
-                backgroundCtx.drawImage(img, 0, 0, img.width, img.height);
+        function startDrawing(e) {
+            isDrawing = true;
+            drawingHistory.push([]);
+            draw(e); // 开始绘制
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = drawingCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            drawingCtx.lineWidth = brushSize; // 笔触大小
+            drawingCtx.lineCap = 'round';
+            drawingCtx.strokeStyle = 'rgba(0,0,0,0.5)'; // 灰色半透明
+
+            drawingCtx.lineTo(x, y);
+            drawingCtx.stroke();
+            drawingCtx.beginPath();
+            drawingCtx.moveTo(x, y);
+
+            drawingHistory[drawingHistory.length - 1].push({ x, y, brushSize });
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            drawingCtx.beginPath();
+        }
+
+        function undoDrawing() {
+            if (drawingHistory.length === 0) return;
+            drawingHistory.pop();
+            redraw();
+        }
+
+        function redraw() {
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            // drawingCtx.drawImage(backgroundImage, 0, 0, drawingCanvas.width, drawingCanvas.height);
+            drawingHistory.forEach(path => {
+                path.forEach(point => {
+                    const rect = drawingCanvas.getBoundingClientRect();
+                    const x = point.x;
+                    const y = point.y;
+
+                    drawingCtx.lineWidth = point.brushSize; // 笔触大小
+                    drawingCtx.lineCap = 'round';
+                    drawingCtx.strokeStyle = 'rgba(0,0,0,0.5)'; // 灰色半透明
+
+                    drawingCtx.lineTo(x, y);
+                    drawingCtx.stroke();
+                    drawingCtx.beginPath();
+                    drawingCtx.moveTo(x, y);
+                });
+                drawingCtx.beginPath();
+
+            });
+        }
+
+        function exportMask() {
+            // 创建一个新的临时canvas，用于导出
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = drawingCanvas.width;
+            tempCanvas.height = drawingCanvas.height;
+
+            // 首先，在临时canvas上绘制一个白色背景
+            tempCtx.fillStyle = '#ffffff'; // 白色填充
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 然后，将drawingCanvas的内容绘制在白色背景上
+            tempCtx.drawImage(drawingCanvas, 0, 0);
+
+            // 导出临时canvas的内容（现在有了白色背景的遮罩）
+            const link = document.createElement('a');
+            link.download = 'mask.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        }
+
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                const img = new Image();
+                img.onload = function () {
+                    // 检查图片尺寸
+                    const validSizes = [
+                        { width: 1024, height: 1024 },
+                        { width: 1792, height: 1024 },
+                        { width: 1024, height: 1792 }
+                    ];
+                    const isValidSize = validSizes.some(size => img.width === size.width && img.height === size.height);
+
+                    if (!isValidSize) {
+                        // 如果尺寸不匹配，显示错误消息并退出
+                        alert("错误: 图片尺寸必须是 1024x1024, 1792x1024, 或 1024x1792。");
+                        return; // 停止执行函数
+                    }
+
+                    // 尺寸符合，初始化canvas并绘制图片
+                    initializeCanvas(img.width, img.height);
+                    backgroundCtx.drawImage(img, 0, 0, img.width, img.height);
+                };
+                img.src = event.target.result;
             };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
+            reader.readAsDataURL(file);
+        }
 
-    document.getElementById('upload').addEventListener('change', handleFileSelect);
-    drawingCanvas.addEventListener('mousedown', startDrawing);
-    drawingCanvas.addEventListener('mousemove', draw);
-    drawingCanvas.addEventListener('mouseup', stopDrawing);
-    drawingCanvas.addEventListener('mouseout', stopDrawing);
-    document.getElementById('export').addEventListener('click', exportMask);
+        // 设置画笔大小
+        function updateBrushSize() {
+            brushSize = document.getElementById('brushSize').value;
+            // 计算圆的半径，可以根据实际需要调整公式
+            let radius = brushSize / 2;
+            // 生成SVG光标
+            let svgCursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${brushSize}" height="${brushSize}" viewport="0 0 ${brushSize} ${brushSize}" style="fill:black;font-size:24px;"><circle cx="${radius}" cy="${radius}" r="${radius - 1}" stroke="black" stroke-width="2" fill="none" /></svg>') ${radius} ${radius}, auto`;
+            // 应用新光标样式
+            drawingCanvas.style.cursor = svgCursor;
+        }
 
-</script>
+        document.getElementById('upload').addEventListener('change', handleFileSelect);
+        drawingCanvas.addEventListener('mousedown', startDrawing);
+        drawingCanvas.addEventListener('mousemove', draw);
+        drawingCanvas.addEventListener('mouseup', stopDrawing);
+        drawingCanvas.addEventListener('mouseout', stopDrawing);
+        document.getElementById('export').addEventListener('click', exportMask);
+        document.getElementById('brushSize').addEventListener('input', updateBrushSize); // 更新画笔大小
+        document.getElementById('undo').addEventListener('click', undoDrawing);
+
+        // 快捷键监听
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                undoDrawing();
+            }
+        });
+
+
+        // 初始化执行
+        updateBrushSize();
+
+
+    </script>
 </body>
+
 </html>
