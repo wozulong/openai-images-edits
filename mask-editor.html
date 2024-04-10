@@ -687,7 +687,7 @@
                 const content = $('#chat-content');
                 const message = `
                     <div class="chat-item">
-                        <div class="chat-item-ai-content">DALL:</div>
+                        <div class="chat-item-ai-content">DELL:</div>
                         <div class="chat-item-content">${data.data[0].revised_prompt}</div>
                         <div class="chat-image-wrapper">
                             <img class="chat-item-content" src="${imageUrl}" alt="image">
@@ -700,16 +700,6 @@
                 `;
                 content.append(message);
             }).catch(error => {
-                /*
-                     {
-                        "error": {
-                            "message": "image generation failed",
-                            "type": "response",
-                            "param": null,
-                            "code": null
-                        }
-                    }
-                 */
                 console.error('Request failed', error);
             });
             // 这里插入发送 formData 到服务器的代码
