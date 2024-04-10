@@ -7,6 +7,12 @@
     <script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
     <style>
 
+        /* 通过CSS添加一个圆形光标 */
+        #drawingCanvas {
+            border: 1px solid;
+            margin-top: 10px;
+        }
+
         :root {
             --menu-height: 50px;
         }
@@ -55,7 +61,7 @@
         }
 
         #toolbar {
-            height: 10%; /* 分配高度的10%给toolbar */
+            height: 20%; /* 分配高度的20%给toolbar */
             display: flex;
             align-items: center;
             justify-content: start; /* 工具栏内容靠左对齐 */
@@ -243,7 +249,7 @@
             flex-shrink: 0; /* 防止在空间不足时缩小 */
         }
 
-        .icon-tool {
+        .icon {
             font-size: 20px;
             width: 20px;
             height: 20px;
@@ -328,7 +334,7 @@
             border-radius: 8px; /* 轻微的圆角 */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 轻微的阴影，增加立体感 */
             padding: 15px; /* 内部间距 */
-            max-width: 80%; /* 聊天项的最大宽度 */
+            max-width: 70%; /* 聊天项的最大宽度 */
             word-wrap: break-word; /* 防止内容溢出 */
         }
 
@@ -357,6 +363,83 @@
             cursor: pointer; /* 鼠标悬停时的手形光标 */
         }
 
+        .chat-item-user {
+            margin: 0 0 10px auto;
+        }
+
+        @keyframes stripeFlickerAnimation {
+            0%, 100% {
+                background-position: 0 0;
+            }
+            50% {
+                background-position: 0 50px; /* 调整这个值以改变动画的速度和方向 */
+            }
+        }
+
+        .chat-item-ai-loading {
+            /* 添加一些基本样式以便更好地显示效果 */
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            /* 定义条纹背景 */
+            background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.1) 75%, transparent 75%, transparent);
+            background-size: 40px 40px; /* 调整这个值以改变条纹的大小 */
+            /* 应用动画 */
+            animation: stripeFlickerAnimation 2s linear infinite forwards;
+        }
+
+
+        .delete-icon-chat {
+            font-size: 20px;
+            color: #ccc; /* 更加柔和的颜色，减少干扰 */
+            cursor: pointer;
+        }
+
+        #chat-input-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: #fff; /* 或者选择与你的UI设计相匹配的颜色 */
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 轻微的阴影效果 */
+        }
+
+        #chat-input-text {
+            flex-grow: 1;
+            margin-right: 10px; /* 与发送按钮之间的间距 */
+            padding: 8px 12px;
+            border: 1px solid #ccc; /* 轻微的边框 */
+            border-radius: 5px; /* 轻微的圆角 */
+            outline: none; /* 移除聚焦时的默认轮廓线 */
+            font-size: 24px; /* 适当的字体大小 */
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1); /* 内部阴影，增加深度感 */
+            transition: border-color 0.3s; /* 平滑的边框颜色过渡效果 */
+        }
+
+        #chat-input-text:focus {
+            border-color: #4A90E2; /* 聚焦时的边框颜色 */
+        }
+
+        #chat-input-btn {
+            padding: 8px 15px;
+            background-color: #4A90E2; /* 按钮背景颜色 */
+            color: #fff;
+            border: none;
+            border-radius: 5px; /* 按钮圆角 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+            transition: background-color 0.3s; /* 背景颜色过渡效果 */
+        }
+
+        #chat-input-btn:hover {
+            background-color: #357ABD; /* 鼠标悬停时的背景颜色 */
+        }
+
+        .chat-item-ai-error {
+            color: red;
+            font-weight: bold;
+        }
+
+
     </style>
 
 </head>
@@ -376,7 +459,7 @@
                 <div id="chat-content"></div>
                 <div id="chat-input-box">
                     <div id="toolbar">
-                        <i class="icon-tool">
+                        <i class="icon icon-tool">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" data-v-ea893728="">
                                 <path fill="currentColor"
                                       d="M764.416 254.72a351.68 351.68 0 0 1 86.336 149.184H960v192.064H850.752a351.68 351.68 0 0 1-86.336 149.312l54.72 94.72-166.272 96-54.592-94.72a352.64 352.64 0 0 1-172.48 0L371.136 936l-166.272-96 54.72-94.72a351.68 351.68 0 0 1-86.336-149.312H64v-192h109.248a351.68 351.68 0 0 1 86.336-149.312L204.8 160l166.208-96h.192l54.656 94.592a352.64 352.64 0 0 1 172.48 0L652.8 64h.128L819.2 160l-54.72 94.72zM704 499.968a192 192 0 1 0-384 0 192 192 0 0 0 384 0"></path>
@@ -423,6 +506,13 @@
             <button id="undo">回退</button>
             <button id="clear">清除</button>
             <button id="close">关闭</button>
+            <i class="icon icon-tool">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" data-v-ea893728="">
+                    <path fill="currentColor"
+                          d="m199.04 672.64 193.984 112 224-387.968-193.92-112-224 388.032zm-23.872 60.16 32.896 148.288 144.896-45.696zM455.04 229.248l193.92 112 56.704-98.112-193.984-112-56.64 98.112zM104.32 708.8l384-665.024 304.768 175.936L409.152 884.8h.064l-248.448 78.336zm384 254.272v-64h448v64h-448z"></path>
+                </svg>
+            </i>
+            <input type="range" id="brush-size" min="1" max="100" value="50" step="1">
         </div>
     </div>
     <div id="canvas-wrapper">
@@ -475,6 +565,11 @@
             if (!file.type.startsWith('image/')) {
                 return;
             }
+            // 限制图片大小为 4M
+            if (file.size > 4 * 1024 * 1024) {
+                alert('图片大小不能超过 4M');
+                return;
+            }
             let reader = new FileReader();
             reader.onloadend = function () {
                 const imgTemplate = `
@@ -515,8 +610,16 @@
                 $(this).closest('.image-item').remove();
                 history[imgId] = []; // 清除历史记录
                 _imgList[imgId] = []; // 清除图片数据
+                scaleImgList[imgId] = []; // 清除缩放后的图片数据
             }
         });
+        // 聊天消息删除事件
+        $('body').on('click', '.delete-icon-chat', function () {
+            if (confirm('确认删除这条消息吗？')) {
+                $(this).closest('.chat-item').remove();
+            }
+        });
+
         // 图片点击事件
         $('body').on('click', '.image-item-content img', function (event) {
             const container = document.getElementById('canvas-container');
@@ -556,9 +659,10 @@
             event.preventDefault(); // 阻止默认的处理方式（打开作为链接）
             // 获取拖拽的图片 ID，并根据 ID 从 _imgList 和 history 中获取数据
             const imgId = event.originalEvent.dataTransfer.getData('text');
-            const imageUrl = scaleImgList[imgId];
+            const imageScaleList = scaleImgList[imgId];
             const imgHistory = history[imgId];
-            if (imageUrl) {
+            if (imageScaleList) {
+                const imageUrl = imageScaleList[imageScaleList.length - 1];
                 // 在这里处理图片，例如添加到聊天输入或显示预览
                 $('#chat-input-wrapper').append(`<img id="source-img" src="${imageUrl}" style="max-width: 50px; max-height: 50px;" />`);
             }
@@ -573,8 +677,9 @@
                 alert('请输入消息内容');
                 return;
             }
+            $('#chat-input-btn').attr('disabled', true);
             callOpenAIEditAPI();
-        })
+        });
     });
 
     async function getImageBlob(url) {
@@ -645,15 +750,23 @@
             formData.append('prompt', $('#chat-input-text').val());
             const content = $('#chat-content');
             const message = `
-                <div class="chat-item">
+                <div class="chat-item chat-item-user">
+                    <div class="chat-item-ai-content">You:</div>
                     <div class="chat-item-content">${$('#chat-input-text').val()}</div>
                         <div class="chat-image-wrapper">
                             ${formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('')}
                             ${formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('')}
                         </div>
                         <div class="chat-item-actions">
-                            <span class="delete-icon" style="cursor: pointer;">&times;</span>
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
                         </div>
+                    </div>
+                </div>
+                <div class="chat-item chat-item-ai chat-item-ai-loading">
+                    <div class="chat-item-ai-content">DALL:</div>
+                    <div class="chat-item-content">正在生成...</div>
+                    <div class="chat-item-actions">
+                        <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
                     </div>
                 </div>
             `;
@@ -670,43 +783,55 @@
                 },
                 body: formData
             }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
                 return response.json();
             }).then(data => {
                 /*
-                {
-                        "created": 1712748493,
-                        "data": [
-                            {
-                                "revised_prompt": "A close-up of a human eye, showing intricate details. The eye has a vivid red color, standing out dramatically. The iris is sharply defined, with natural variations in shade and texture, resembling a normal eye but with the unique red hue. The surrounding skin and eyelashes are rendered realistically, emphasizing the contrast and highlighting the red eye as the focal point. The image should have a realistic and detailed style, capturing the beauty and intensity of the red eye.",
-                                "url": "https://files.oaifree.com/file-Ik4JxrY83kGsRcodrbmvea9I?se=2024-04-10T11%3A33%3A48Z\u0026sp=r\u0026sv=2021-08-06\u0026sr=b\u0026rscc=max-age%3D31536000%2C%20immutable\u0026rscd=attachment%3B%20filename%3Daa346b17-dc68-46a6-b971-d4eeb554703e.webp\u0026sig=Szc%2BOUhYOPLvtvJTByoeWdQ5hC8mW7FcSFLy4mDmZfk%3D"
-                            }
-                        ]
-                    }
-                 */
+               {
+                       "created": 1712748493,
+                       "data": [
+                           {
+                               "revised_prompt": "A close-up of a human eye, showing intricate details. The eye has a vivid red color, standing out dramatically. The iris is sharply defined, with natural variations in shade and texture, resembling a normal eye but with the unique red hue. The surrounding skin and eyelashes are rendered realistically, emphasizing the contrast and highlighting the red eye as the focal point. The image should have a realistic and detailed style, capturing the beauty and intensity of the red eye.",
+                               "url": "https://files.oaifree.com/file-Ik4JxrY83kGsRcodrbmvea9I?se=2024-04-10T11%3A33%3A48Z\u0026sp=r\u0026sv=2021-08-06\u0026sr=b\u0026rscc=max-age%3D31536000%2C%20immutable\u0026rscd=attachment%3B%20filename%3Daa346b17-dc68-46a6-b971-d4eeb554703e.webp\u0026sig=Szc%2BOUhYOPLvtvJTByoeWdQ5hC8mW7FcSFLy4mDmZfk%3D"
+                           }
+                       ]
+                   }
+                */
                 const imageUrl = data.data[0].url;
-                const content = $('#chat-content');
+                const content = $('#chat-content .chat-item-ai-loading');
                 const message = `
-                    <div class="chat-item">
-                        <div class="chat-item-ai-content">DELL:</div>
+                        <div class="chat-item-ai-content">DALL:</div>
                         <div class="chat-item-content">${data.data[0].revised_prompt}</div>
                         <div class="chat-image-wrapper">
                             <img class="chat-item-content" src="${imageUrl}" alt="image">
-
                         </div>
                         <div class="chat-item-actions">
-                            <span class="delete-icon" style="cursor: pointer;">&times;</span>
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
                         </div>
-                    </div>
                 `;
-                content.append(message);
+                content.html(message);
+                content.removeClass('chat-item-ai-loading');
             }).catch(error => {
+                const content = $('#chat-content .chat-item-ai-loading');
+                const errorMessage = `
+                        <div class="chat-item-ai-content">DALL:</div>
+                        <div class="chat-item-content">${error.message}</div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
+                        </div>
+                `;
+                content.html(errorMessage);
+                content.removeClass('chat-item-ai-loading');
+                content.addClass('chat-item-ai-error');
                 console.error('Request failed', error);
-            });
+            }).finally(() => $('#chat-input-btn').attr('disabled', false));
             // 这里插入发送 formData 到服务器的代码
             // 例如： uploadData(formData);
         }).catch(error => {
             console.error('获取图像失败:', error);
-        });
+        }).finally(() => $('#chat-input-btn').attr('disabled', false));
 
 
     }
@@ -932,7 +1057,7 @@
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        drawingCtx.lineWidth = 50; // 笔触大小
+        drawingCtx.lineWidth = $('#brush-size').val(); // 笔触大小
         drawingCtx.lineCap = 'round';
         drawingCtx.strokeStyle = 'rgba(0,0,0,0.5)'; // 灰色半透明
 
@@ -972,11 +1097,22 @@
         link.click();
     }
 
+    // 设置画笔大小
+    function updateBrushSize() {
+        const brushSize = $('#brush-size').val();
+        // 计算圆的半径，可以根据实际需要调整公式
+        let radius = brushSize / 2;
+        // 应用新光标样式
+        drawingCanvas.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${brushSize}" height="${brushSize}" viewport="0 0 ${brushSize} ${brushSize}" style="fill:black;font-size:24px;"><circle cx="${radius}" cy="${radius}" r="${radius - 1}" stroke="black" stroke-width="2" fill="none" /></svg>') ${radius} ${radius}, auto`;
+    }
+
+    $('#brush-size').on('input', updateBrushSize);
+
     drawingCanvas.addEventListener('mousedown', startDrawing);
     drawingCanvas.addEventListener('mousemove', draw);
     drawingCanvas.addEventListener('mouseup', stopDrawing);
     drawingCanvas.addEventListener('mouseout', stopDrawing);
-
+    updateBrushSize(); // 初始化光标样式
 
 </script>
 </body>
