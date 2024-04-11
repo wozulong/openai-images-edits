@@ -133,6 +133,7 @@
             display: flex; /* 使用 Flexbox 以便于内容居中 */
             align-items: center; /* 垂直居中 */
             justify-content: center; /* 水平居中 */
+            cursor: pointer; /* 鼠标悬停时显示手型光标 */
         }
 
         .image-item-content img {
@@ -453,6 +454,14 @@
         #imageOverlay img {
             max-width: 80%; /* 最大宽度，确保不会超过屏幕 */
             max-height: 80%; /* 最大高度，确保不会超过屏幕 */
+        }
+
+        .show-image {
+            cursor: pointer;
+        }
+
+        .show-image:hover {
+            opacity: 0.8;
         }
 
     </style>
@@ -1229,7 +1238,6 @@
         // 获取window的宽高
         const windowWidth = width || window.innerWidth * 0.85;
         const windowHeight = height || window.innerHeight * 0.85;
-        console.log('getScale', windowWidth, windowHeight);
         // 计算缩放比例
         const scaleX = windowWidth / img.width;
         const scaleY = windowHeight / img.height;
