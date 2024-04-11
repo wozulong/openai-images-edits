@@ -1001,8 +1001,8 @@
                     <div class="chat-item-ai-content">You:</div>
                     <div class="chat-item-content">${formData.get ? formData.get('prompt') : formData.prompt}</div>
                         <div class="chat-image-wrapper">
-                            ${formData.getAll ? formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('') : ''}
-                            ${formData.getAll ? formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('') : ''}
+                            ${formData.getAll ? formData.getAll('image').map(img => `<img class="chat-item-content show-image" src="${img.name.replace('image.', '')}" alt="image">`).join('') : ''}
+                            ${formData.getAll ? formData.getAll('mask').map(img => `<img class="chat-item-content  show-image" src="${img.name.replace('mask.', '')}" alt="image">`).join('') : ''}
                         </div>
                         <div class="chat-item-actions">
                             <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
