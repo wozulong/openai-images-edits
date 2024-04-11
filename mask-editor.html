@@ -138,9 +138,7 @@
         .image-item-content img {
             max-width: 300px; /* 保证图片不会超出容器 */
             max-height: 200px; /* 保证图片不会超出容器 */
-            width: 300px;
-            height: 200px;
-            image-rendering: high-quality;
+            object-fit: contain; /* 保持图片比例 */
         }
 
         #canvas-container {
@@ -439,6 +437,23 @@
             font-weight: bold;
         }
 
+        #imageOverlay {
+            position: fixed; /* 固定位置，全屏覆盖 */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); /* 半透明背景 */
+            display: flex;
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            z-index: 1000; /* 确保在最上层 */
+        }
+
+        #imageOverlay img {
+            max-width: 80%; /* 最大宽度，确保不会超过屏幕 */
+            max-height: 80%; /* 最大高度，确保不会超过屏幕 */
+        }
 
     </style>
 
@@ -475,6 +490,11 @@
             </div>
         </div>
     </div>
+
+    <!-- 图片放大覆盖层 -->
+    <div id="imageOverlay" style="display:none;" onclick="closeOverlay();">
+        <img id="overlayImage" src="" alt="Expanded image">
+    </div>
 </div>
 
 <div id="modal" class="modal">
@@ -490,6 +510,53 @@
                 </td>
                 <td>
                     <input size="50" type="text" id="openAIToken" placeholder="输入Open AI的Access token">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="apiBaseUrl">API Base Url：</label>
+                </td>
+                <td>
+                    <input size="50" type="text" id="apiBaseUrl" placeholder="输入API Base Url">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="dallModel">DALL-E模型：</label>
+                </td>
+                <td>
+                    <select id="dallModel">
+                        <option value="dall-e-2" selected>dall-e-2</option>
+                        <option value="dall-e-3">dall-e-3</option>
+                    </select>
+                </td>
+            </tr>
+            <tr id="imageQualityRow">
+                <td>
+                    <label for="imageQuality">DALL-E模型：</label>
+                </td>
+                <td>
+                    <select id="imageQuality">
+                        <option value="standard" selected>standard</option>
+                        <option value="hd">hd</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label>构造图片大小</label>
+                </td>
+                <td>
+                    <select id="dall-e-2-size">
+                        <option value="256x256">256x256</option>
+                        <option value="512x512">512x512</option>
+                        <option value="1024x1024" selected>1024x1024</option>
+                    </select>
+                    <select id="dall-e-3-size" style="display:none;">
+                        <option value="1024x1024" selected>1024x1024</option>
+                        <option value="1792x1024">1792x1024</option>
+                        <option value="1024x1792">1024x1792</option>
+                    </select>
                 </td>
             </tr>
         </table>
@@ -521,10 +588,72 @@
     </div>
 </div>
 <script>
+
+    const defaultAPIBaseUrl = 'https://api.oaifree.com/v1/';
+    const defaultDallModel = 'dall-e-2';
+    const defaultImageQuality = 'standard';
+    const defaultDallE2Size = '1024x1024';
+    const defaultDallE3Size = '1024x1792';
+
+    /**
+     * 初始化参数
+     */
+    function initParams() {
+        $('#openAIToken').val(getLocalStorage('openAIToken') || '');
+        $('#apiBaseUrl').val(getLocalStorage('apiBaseUrl') || defaultAPIBaseUrl);
+        $('#dallModel').val(getLocalStorage('dallModel') || defaultDallModel);
+        $('#imageQuality').val(getLocalStorage('imageQuality') || defaultImageQuality);
+        $('#dall-e-2-size').val(getLocalStorage('dallE2Size') || defaultDallE2Size);
+        $('#dall-e-3-size').val(getLocalStorage('dallE3Size') || defaultDallE3Size);
+        if ($('#dallModel').val() === 'dall-e-3') {
+            $('#dall-e-3-size').show();
+            $('#dall-e-2-size').hide();
+        } else {
+            $('#dall-e-3-size').hide();
+            $('#dall-e-2-size').show();
+        }
+    }
+
     // 图片索引
     let imgIndex = 0;
     $(() => {
-        let $imgContainer = $('#image-container');
+        // 初始化参数
+        initParams();
+        // #region 设置 配置参数时间 -------
+        $('#dallModel').on('change', function () {
+            if ($(this).val() === 'dall-e-3') {
+                $('#dall-e-3-size').show();
+                $('#dall-e-2-size').hide();
+            } else {
+                $('#dall-e-3-size').hide();
+                $('#dall-e-2-size').show();
+            }
+            setLocalStorage('dallModel', $(this).val());
+        });
+        $('#imageQuality').on('change', function () {
+            setLocalStorage('imageQuality', $(this).val());
+        });
+        $('#dall-e-2-size').on('change', function () {
+            setLocalStorage('dallE2Size', $(this).val());
+        })
+
+        $('#dall-e-3-size').on('change', function () {
+            setLocalStorage('dallE3Size', $(this).val());
+        });
+        // 隐藏模态框
+        $('.modal-close-btn, #close-modal-btn').on('click', hideModal);
+        // 显示模态框
+        $('.icon-tool').on('click', showModal);
+        // 保存设置
+        $('#save-modal-btn').on('click', function () {
+            setLocalStorage('openAIToken', $('#openAIToken').val());
+            setLocalStorage('apiBaseUrl', $('#apiBaseUrl').val());
+            hideModal();
+        });
+        // #endregion 设置 配置参数时间 -------
+
+        // #region 图片拖拽事件 -------
+        const $imgContainer = $('#image-container');
         // 阻止默认的拖放事件行为
         $imgContainer.on('dragenter dragover dragleave drop', function (e) {
             e.preventDefault();
@@ -543,8 +672,14 @@
 
         // 处理文件拖放
         $imgContainer.on('drop', function (e) {
-            let files = e.originalEvent.dataTransfer.files;
+            const files = e.originalEvent.dataTransfer.files;
             handleFiles(files);
+        });
+
+        $('#container-aside').on('drop', function (e) {
+            const imgId = e.originalEvent.dataTransfer.getData('text');
+            const imageUrl = $('#' + imgId).attr('src');
+            addImageToWall(imageUrl, 'dall-img.jpg');
         });
 
         /**
@@ -572,24 +707,7 @@
             }
             let reader = new FileReader();
             reader.onloadend = function () {
-                const imgTemplate = `
-                        <div class="image-item">
-                            <div class="image-item-actions">
-                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">&times;</span>
-                            </div>
-                            <div class="image-item-content">
-                                <img src="${reader.result}" alt="${file.name}" id="img-${imgIndex++}">
-                            </div>
-                         </div>
-                    `;
-                $('#image-wall').append(imgTemplate);
-                // 保存图片数据
-                _imgList['img-' + (imgIndex - 1)] = (reader.result);
-                // 设置 .image-item-content 中的 img 为可拖拽
-                $('.image-item-content img').attr('draggable', true).on('dragstart', function (event) {
-                    // 在拖动开始时，将图片的 src 存储在 dataTransfer 对象中
-                    event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
-                });
+                addImageToWall(reader.result, file.name);
             }
             reader.readAsDataURL(file);
         }
@@ -639,19 +757,9 @@
         );
         // 关闭画布
         $('#close').on('click', hideCanvas);
-        // 隐藏模态框
-        $('.modal-close-btn, #close-modal-btn').on('click', hideModal);
-        // 显示模态框
-        $('.icon-tool').on('click', showModal);
-        // 保存设置
-        $('#save-modal-btn').on('click', function () {
-            const openAIToken = $('#openAIToken').val();
-            setLocalStorage('openAIToken', openAIToken);
-            hideModal();
-        });
 
         // 允许 #chat-input-wrapper 接收拖拽
-        $('#chat-input-wrapper').on('dragover', function (event) {
+        $('#chat-box').on('dragover', function (event) {
             event.preventDefault(); // 阻止默认行为，允许放置
         }).on('drop', function (event) {
             // 清空输入框中的图片
@@ -680,9 +788,42 @@
             $('#chat-input-btn').attr('disabled', true);
             callOpenAIEditAPI();
         });
+        // #endregion 图片拖拽事件 -------
     });
 
-    async function getImageBlob(url) {
+    /**
+     *  添加图片到图片墙
+     * @param src 图片地址
+     * @param name 图片名称
+     */
+    function addImageToWall(src, name) {
+        const imgTemplate = `
+                        <div class="image-item">
+                            <div class="image-item-actions">
+                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">&times;</span>
+                            </div>
+                            <div class="image-item-content">
+                                <img src="${src}" alt="${name}" id="img-${imgIndex++}">
+                            </div>
+                         </div>
+                    `;
+        $('#image-wall').append(imgTemplate);
+        // 保存图片数据
+        _imgList['img-' + (imgIndex - 1)] = (src);
+        // 设置 .image-item-content 中的 img 为可拖拽
+        $('.image-item-content img').attr('draggable', true).on('dragstart', function (event) {
+            // 在拖动开始时，将图片的 src 存储在 dataTransfer 对象中
+            event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
+        });
+    }
+
+    /**
+     *  获取图片的Blob数据
+     * @param url 图片地址
+     * @param fillColor 背景颜色 (可选)
+     * @returns {Promise<Blob>}
+     */
+    async function getImageBlob(url, fillColor = null) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous'; // 如果图片来源于不同的域，尝试设置此属性
@@ -691,26 +832,37 @@
                 const scaleX = 1024 / img.width;
                 const scaleY = 1792 / img.height;
                 // 应用缩放比例到宽度和高度来保持宽高比
-                canvas.width = Math.ceil(scaleX * img.width);
-                canvas.height = Math.ceil(scaleY * img.height);
+                canvas.width = 1024;
+                canvas.height = 1792;
                 // 绘制图片到临时canvas
                 const ctx = canvas.getContext('2d');
                 // 首先，在临时canvas上绘制一个白色背景
-                ctx.fillStyle = '#ffffff'; // 白色填充
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                // 检查是否需要旋转（宽度大于高度）
-                const needRotate = img.width > img.height;
-                if (needRotate) {
-                    // 将绘制的原点移动到新的中心点
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    // 旋转画布
-                    ctx.rotate(Math.PI / 2); // 旋转90度（π/2弧度）
-                    // 绘制图片，由于画布已经旋转并且原点也改变了，需要调整图片的位置
-                    ctx.drawImage(img, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
-                } else {
-                    // 在调整后的canvas尺寸上绘制图片
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                if (fillColor) {
+                    ctx.fillStyle = '#fff'; // 白色填充
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
                 }
+                const scaleToFit = Math.min(scaleX, scaleY);
+                // 计算图片绘制的尺寸
+                const imageWidth = img.width * scaleToFit;
+                const imageHeight = img.height * scaleToFit;
+                // 计算绘制的起始点，以使图片居中
+                const offsetX = (canvas.width - imageWidth) / 2;
+                const offsetY = (canvas.height - imageHeight) / 2;
+                // 绘制图片
+                ctx.drawImage(img, offsetX, offsetY, imageWidth, imageHeight);
+                // // 检查是否需要旋转（宽度大于高度）
+                // const needRotate = img.width > img.height;
+                // if (needRotate) {
+                //     // 将绘制的原点移动到新的中心点
+                //     ctx.translate(canvas.width / 2, canvas.height / 2);
+                //     // 旋转画布
+                //     ctx.rotate(Math.PI / 2); // 旋转90度（π/2弧度）
+                //     // 绘制图片，由于画布已经旋转并且原点也改变了，需要调整图片的位置
+                //     ctx.drawImage(img, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+                // } else {
+                //     // 在调整后的canvas尺寸上绘制图片
+                //     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // }
                 canvas.toBlob(resolve);
             };
             img.onerror = reject;
@@ -718,6 +870,10 @@
         });
     }
 
+    /**
+     * 发送消息到 OpenAI API 进行编辑
+     * @returns {Promise<void>}
+     */
     async function callOpenAIEditAPI() {
         const formData = new FormData();
         const sourceUrl = $('#source-img')?.attr('src');
@@ -734,7 +890,7 @@
                 name: 'image',
                 type: sourceUrl.split('.').pop()
             })) : Promise.resolve(null), // 如果没有 sourceUrl，返回一个解决为null的Promise
-            maskUrl ? getImageBlob(maskUrl).then(blob => ({
+            maskUrl ? getImageBlob(maskUrl, '#fff').then(blob => ({
                 blob: blob,
                 name: 'mask',
                 type: maskUrl.split('.').pop()
@@ -748,11 +904,76 @@
             });
             // 继续处理 formData
             formData.append('prompt', $('#chat-input-text').val());
-            const content = $('#chat-content');
-            const message = `
+            formData.append('n', 1);
+            formData.append('size', '1024x1024');
+            // TODO 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+            // TODO 需要抽离出来
+            fetch($('apiBaseUrl').val() + '/images/edits', {
+                method: 'POST',
+                headers: {
+                    // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+                    'Authorization': 'Bearer ' + $('openAIToken').val(),
+                },
+                body: formData
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('OpenAI API 请求失败:', response);
+                    return Promise.reject(response.json());
+                }
+                return response.json();
+            }).then(data =>
+                addDallChatMessage(data)
+            ).catch(error => {
+                error.then(data => {
+                    addErrorMessage(data);
+                });
+            }).finally(() => $('#chat-input-btn').attr('disabled', false));
+            // 这里插入发送 formData 到服务器的代码
+            // 例如： uploadData(formData);
+        }).catch(error => {
+            console.error('获取图像失败:', error);
+            $('#chat-input-btn').attr('disabled', false);
+        })
+    }
+
+    function callOpenAIGenerateAPI() {
+        $('#chat-input-btn').attr('disabled', true);
+        const prompt = $('#chat-input-text').val();
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('model', $('#dallModel').val());
+        formData.append('n', 1);
+        const size = $('#dallModel').val() === 'dall-e-2' ? $('#dall-e-2-size').val() : $('#dall-e-3-size').val();
+        formData.append('size', size);
+        formData.append('quality', $('#dall-quality').val());
+        addUserChatMessage(formData);
+        fetch($('apiBaseUrl').val() + '/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+                'Authorization': 'Bearer ' + $('openAIToken').val(),
+            },
+            body: formData
+        }).then(response => {
+            if (!response.ok) {
+                console.error('OpenAI API 请求失败:', response);
+                return Promise.reject(response.json());
+            }
+            return response.json();
+        }).then(data => addDallChatMessage(data)).catch(error => {
+            error.then(data => {
+                addErrorMessage(data);
+            });
+        }).finally(() => $('#chat-input-btn').attr('disabled', false));
+    }
+
+    function addUserChatMessage(formData) {
+        const content = $('#chat-content');
+        const message = `
                 <div class="chat-item chat-item-user">
                     <div class="chat-item-ai-content">You:</div>
-                    <div class="chat-item-content">${$('#chat-input-text').val()}</div>
+                    <div class="chat-item-content">${formData.get('prompt')}</div>
                         <div class="chat-image-wrapper">
                             ${formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('')}
                             ${formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('')}
@@ -770,70 +991,61 @@
                     </div>
                 </div>
             `;
-            content.append(message);
+        content.append(message);
+    }
 
-            formData.append('n', 1);
-            formData.append('size', '1024x1024');
-
-            fetch('https://api.oaifree.com/v1/images/edits', {
-                method: 'POST',
-                headers: {
-                    // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
-                    'Authorization': 'Bearer ' + getLocalStorage('openAIToken'),
-                },
-                body: formData
-            }).then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            }).then(data => {
-                /*
-               {
-                       "created": 1712748493,
-                       "data": [
-                           {
-                               "revised_prompt": "A close-up of a human eye, showing intricate details. The eye has a vivid red color, standing out dramatically. The iris is sharply defined, with natural variations in shade and texture, resembling a normal eye but with the unique red hue. The surrounding skin and eyelashes are rendered realistically, emphasizing the contrast and highlighting the red eye as the focal point. The image should have a realistic and detailed style, capturing the beauty and intensity of the red eye.",
-                               "url": "https://files.oaifree.com/file-Ik4JxrY83kGsRcodrbmvea9I?se=2024-04-10T11%3A33%3A48Z\u0026sp=r\u0026sv=2021-08-06\u0026sr=b\u0026rscc=max-age%3D31536000%2C%20immutable\u0026rscd=attachment%3B%20filename%3Daa346b17-dc68-46a6-b971-d4eeb554703e.webp\u0026sig=Szc%2BOUhYOPLvtvJTByoeWdQ5hC8mW7FcSFLy4mDmZfk%3D"
-                           }
-                       ]
-                   }
-                */
-                const imageUrl = data.data[0].url;
-                const content = $('#chat-content .chat-item-ai-loading');
-                const message = `
+    function addDallChatMessage(data) {
+        const imageUrl = data.data[0].url;
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // 这是关键，允许跨域访问
+        img.onload = function () {
+            // 创建canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            // 将图片绘制到canvas上
+            ctx.drawImage(img, 0, 0);
+            // 将canvas内容转换为Base64
+            const imageUrl = canvas.toDataURL(img.type);
+            // 显示生成的图片
+            const content = $('#chat-content .chat-item-ai-loading');
+            const message = `
                         <div class="chat-item-ai-content">DALL:</div>
                         <div class="chat-item-content">${data.data[0].revised_prompt}</div>
                         <div class="chat-image-wrapper">
-                            <img class="chat-item-content" src="${imageUrl}" alt="image">
+                            <img class="chat-item-content show-image" src="${imageUrl}" id="dall-image-${imgIndex++}" alt="image" data-width="${img.width}" data-height="${img.height}" />
                         </div>
                         <div class="chat-item-actions">
                             <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
                         </div>
-                `;
-                content.html(message);
-                content.removeClass('chat-item-ai-loading');
-            }).catch(error => {
-                const content = $('#chat-content .chat-item-ai-loading');
-                const errorMessage = `
+                    `;
+
+            content.html(message);
+            content.removeClass('chat-item-ai-loading');
+
+            // 设置 .image-item-content 中的 img 为可拖拽
+            content.find('.chat-item-content img').attr('draggable', true).on('dragstart', function (event) {
+                // 在拖动开始时，将图片的 id 存储在 dataTransfer 对象中
+                event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
+            });
+        }
+        img.src = imageUrl;
+    }
+
+    function addErrorMessage(error) {
+        const content = $('#chat-content .chat-item-ai-loading');
+        const errorMessage = `
                         <div class="chat-item-ai-content">DALL:</div>
-                        <div class="chat-item-content">${error.message}</div>
+                        <div class="chat-item-content">${error.error.message}</div>
                         <div class="chat-item-actions">
                             <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
                         </div>
                 `;
-                content.html(errorMessage);
-                content.removeClass('chat-item-ai-loading');
-                content.addClass('chat-item-ai-error');
-                console.error('Request failed', error);
-            }).finally(() => $('#chat-input-btn').attr('disabled', false));
-            // 这里插入发送 formData 到服务器的代码
-            // 例如： uploadData(formData);
-        }).catch(error => {
-            console.error('获取图像失败:', error);
-        }).finally(() => $('#chat-input-btn').attr('disabled', false));
-
-
+        content.html(errorMessage);
+        content.removeClass('chat-item-ai-loading');
+        content.addClass('chat-item-ai-error');
+        console.error('Request failed', data);
     }
 
     function setLocalStorage(key, value) {
@@ -846,7 +1058,6 @@
 
     // 显示模态框函数
     function showModal() {
-        $('#openAIToken').val(getLocalStorage('openAIToken') || '');
         document.getElementById('modal').style.display = 'block';
     }
 
@@ -1113,6 +1324,25 @@
     drawingCanvas.addEventListener('mouseup', stopDrawing);
     drawingCanvas.addEventListener('mouseout', stopDrawing);
     updateBrushSize(); // 初始化光标样式
+
+    function expandImage(imgElement) {
+        const overlay = $('#imageOverlay');
+        const overlayImg = $('#overlayImage');
+        overlay.css('display', 'flex'); // 显示覆盖层
+        overlayImg.attr('src', imgElement.src); // 设置覆盖层中图片的源为被点击图片的源
+
+    }
+
+    function closeOverlay() {
+        $('#imageOverlay').hide(); // 隐藏覆盖层
+    }
+
+    // 图片点击事件
+    $('body').on('click', '.chat-image-wrapper .show-image', function (event) {
+        event.stopPropagation(); // 阻止事件冒泡
+        expandImage(event.target); // 显示覆盖层
+    });
+
 
 </script>
 </body>

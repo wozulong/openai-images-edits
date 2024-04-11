@@ -7,3 +7,5 @@
 .project
 .classpath
 .settings/
+modules.xml
+vcs.xml
