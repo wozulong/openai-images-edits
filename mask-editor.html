@@ -34,7 +34,7 @@
             border-right: 2px solid #ccc;
             padding: 10px;
             box-sizing: border-box;
-            overflow-y: auto; /* 允许滚动 */
+            /*overflow-y: auto; !* 允许滚动 *!*/
         }
 
         #container-main {
@@ -589,7 +589,7 @@
 </div>
 <script>
 
-    const defaultAPIBaseUrl = 'https://api.oaifree.com/v1/';
+    const defaultAPIBaseUrl = 'https://api.oaifree.com/v1';
     const defaultDallModel = 'dall-e-2';
     const defaultImageQuality = 'standard';
     const defaultDallE2Size = '1024x1024';
@@ -646,8 +646,11 @@
         $('.icon-tool').on('click', showModal);
         // 保存设置
         $('#save-modal-btn').on('click', function () {
+            const apiBaseUrl = $('#apiBaseUrl');
+            const replaceUrl = apiBaseUrl.val().replace(/\/+$/, '');
+            apiBaseUrl.val(replaceUrl);
             setLocalStorage('openAIToken', $('#openAIToken').val());
-            setLocalStorage('apiBaseUrl', $('#apiBaseUrl').val());
+            setLocalStorage('apiBaseUrl', replaceUrl);
             hideModal();
         });
         // #endregion 设置 配置参数时间 -------
@@ -785,8 +788,12 @@
                 alert('请输入消息内容');
                 return;
             }
-            $('#chat-input-btn').attr('disabled', true);
-            callOpenAIEditAPI();
+            if ($('#source-img, #mask-img').length) {
+                $('#chat-input-btn').attr('disabled', true);
+                callOpenAIEditAPI();
+            } else {
+                callOpenAIGenerateAPI();
+            }
         });
         // #endregion 图片拖拽事件 -------
     });
@@ -815,6 +822,15 @@
             // 在拖动开始时，将图片的 src 存储在 dataTransfer 对象中
             event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
         });
+    }
+
+    /**
+     *  清除聊天消息
+     */
+    function clearChatMessageSendArea() {
+        // 清空输入框中的图片
+        $('#source-img, #mask-img').remove();
+        $('#chat-input-text').val('');
     }
 
     /**
@@ -906,13 +922,15 @@
             formData.append('prompt', $('#chat-input-text').val());
             formData.append('n', 1);
             formData.append('size', '1024x1024');
+            addUserChatMessage(formData);
+            clearChatMessageSendArea();
             // TODO 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
             // TODO 需要抽离出来
-            fetch($('apiBaseUrl').val() + '/images/edits', {
+            fetch($('#apiBaseUrl').val() + '/images/edits', {
                 method: 'POST',
                 headers: {
                     // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
-                    'Authorization': 'Bearer ' + $('openAIToken').val(),
+                    'Authorization': 'Bearer ' + $('#openAIToken').val(),
                 },
                 body: formData
             }).then(response => {
@@ -924,6 +942,7 @@
             }).then(data =>
                 addDallChatMessage(data)
             ).catch(error => {
+                console.error('OpenAI API 请求失败:', error);
                 error.then(data => {
                     addErrorMessage(data);
                 });
@@ -939,22 +958,24 @@
     function callOpenAIGenerateAPI() {
         $('#chat-input-btn').attr('disabled', true);
         const prompt = $('#chat-input-text').val();
-        const formData = new FormData();
-        formData.append('prompt', prompt);
-        formData.append('model', $('#dallModel').val());
-        formData.append('n', 1);
+
         const size = $('#dallModel').val() === 'dall-e-2' ? $('#dall-e-2-size').val() : $('#dall-e-3-size').val();
-        formData.append('size', size);
-        formData.append('quality', $('#dall-quality').val());
-        addUserChatMessage(formData);
-        fetch($('apiBaseUrl').val() + '/images/generations', {
+        const data = {
+            prompt: prompt,
+            n: 1,
+            size: size,
+            quality: $('#imageQuality').val(),
+            model: $('#dallModel').val()
+        }
+        addUserChatMessage(data);
+        fetch($('#apiBaseUrl').val() + '/images/generations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
-                'Authorization': 'Bearer ' + $('openAIToken').val(),
+                'Authorization': 'Bearer ' + $('#openAIToken').val(),
             },
-            body: formData
+            body: JSON.stringify(data)
         }).then(response => {
             if (!response.ok) {
                 console.error('OpenAI API 请求失败:', response);
@@ -973,10 +994,10 @@
         const message = `
                 <div class="chat-item chat-item-user">
                     <div class="chat-item-ai-content">You:</div>
-                    <div class="chat-item-content">${formData.get('prompt')}</div>
+                    <div class="chat-item-content">${formData.get ? formData.get('prompt') : formData.prompt}</div>
                         <div class="chat-image-wrapper">
-                            ${formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('')}
-                            ${formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('')}
+                            ${formData.getAll ? formData.getAll('image').map(img => `<img class="chat-item-content" src="${img.name.replace('image.', '')}" alt="image">`).join('') : ''}
+                            ${formData.getAll ? formData.getAll('mask').map(img => `<img class="chat-item-content" src="${img.name.replace('mask.', '')}" alt="image">`).join('') : ''}
                         </div>
                         <div class="chat-item-actions">
                             <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
