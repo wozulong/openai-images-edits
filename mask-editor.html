@@ -989,6 +989,11 @@
         }).finally(() => $('#chat-input-btn').attr('disabled', false));
     }
 
+    function scrollToBottom(selector) {
+        $(selector).animate({scrollTop: $(selector)[0].scrollHeight}, 'slow');
+
+    }
+
     function addUserChatMessage(formData) {
         const content = $('#chat-content');
         const message = `
@@ -1013,6 +1018,7 @@
                 </div>
             `;
         content.append(message);
+        scrollToBottom('#chat-content');
     }
 
     function addDallChatMessage(data) {
@@ -1050,6 +1056,7 @@
                 // 在拖动开始时，将图片的 id 存储在 dataTransfer 对象中
                 event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
             });
+            scrollToBottom('#chat-content');
         }
         img.src = imageUrl;
     }
@@ -1066,6 +1073,7 @@
         content.html(errorMessage);
         content.removeClass('chat-item-ai-loading');
         content.addClass('chat-item-ai-error');
+        scrollToBottom('#chat-content');
         console.error('Request failed', data);
     }
 
