@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Mask Creator</title>
+    <script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
+    <style>
+        /* 通过CSS添加一个圆形光标 */
+        #drawingCanvas {
+            border: 1px solid;
+            margin-top: 10px;
+        }
+
+        :root {
+            --menu-height: 50px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #container-header {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        #container-aside {
+            flex-basis: 25%;
+            max-width: 25%;
+            border-right: 2px solid #ccc;
+            padding: 10px;
+            box-sizing: border-box;
+            /*overflow-y: auto; !* 允许滚动 *!*/
+        }
+
+        #container-main {
+            flex-grow: 1;
+            padding: 10px;
+        }
+
+        #chat-box {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #chat-content {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        #chat-input-box {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column; /* 列布局确保toolbar和输入区域垂直排列 */
+            margin-top: auto; /* 自动调整上边距，确保贴近底部 */
+        }
+
+        #toolbar {
+            height: 20%; /* 分配高度的20%给toolbar */
+            display: flex;
+            align-items: center;
+            justify-content: start; /* 工具栏内容靠左对齐 */
+            padding: 0 10px;
+        }
+
+        #chat-input-wrapper {
+            flex-grow: 1; /* 占据剩余空间 */
+            display: flex;
+            align-items: center; /* 垂直居中输入框和按钮 */
+            padding: 0 10px;
+        }
+
+        #chat-input-text {
+            width: auto; /* 输入框自动调整宽度 */
+            flex-grow: 1; /* 输入框占据大部分空间 */
+            margin-right: 10px; /* 与发送按钮间隔 */
+        }
+
+        #chat-input-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+
+
+        #image-container.over {
+            border-color: #000;
+        }
+
+        .upload-hint {
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* 非前缀版本，Chrome和Opera等 */
+            cursor: pointer;
+            font-size: 18px;
+            color: #999;
+        }
+
+        .image-item {
+            padding: 5px;
+            position: relative; /* 使内部的绝对定位元素相对于此元素定位 */
+            border: 2px dashed #ccc; /* 可选：为了可视化 */
+            margin-top: 20px; /* 可选：如果有多个 image-item */
+            width: 310px;
+        }
+
+        .image-item-actions {
+            position: absolute; /* 绝对定位 */
+            top: 0;
+            right: 0;
+            z-index: 10; /* 确保图标位于图片之上 */
+        }
+
+        .delete-icon {
+            cursor: pointer;
+            background-color: white; /* 使图标更加显眼 */
+            border-radius: 50%; /* 圆形背景 */
+            padding: 5px; /* 内边距，根据需要调整 */
+        }
+
+        .image-item-content {
+            width: 100%; /* 占满整个容器 */
+            height: 100%; /* 占满整个容器 */
+            display: flex; /* 使用 Flexbox 以便于内容居中 */
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            cursor: pointer; /* 鼠标悬停时显示手型光标 */
+        }
+
+        .image-item-content img {
+            max-width: 300px; /* 保证图片不会超出容器 */
+            max-height: 200px; /* 保证图片不会超出容器 */
+            object-fit: contain; /* 保持图片比例 */
+        }
+
+        #canvas-container {
+            position: fixed; /* 或 absolute，取决于你需要的布局 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            top: 0; /* 根据需要调整 */
+            display: none; /* 初始状态为隐藏 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            height: 100vh;
+            background-color: rgba(204, 204, 204, 0.9); /* 可选：增加背景色以增强可见性 */
+        }
+
+        #backgroundCanvas, #drawingCanvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            margin: auto;
+        }
+
+        #backgroundCanvas {
+            z-index: 999991;
+        }
+
+        #drawingCanvas {
+            z-index: 999992;
+        }
+
+
+        #canvas-header {
+            background-color: #f2f2f2; /* 轻灰色背景 */
+            width: 100%; /* 头部宽度占满容器宽度 */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 下方阴影，增加立体感 */
+            position: absolute;
+            margin-top: 10px;
+            top: 0;
+        }
+
+        #menu {
+            display: flex;
+            gap: 10px; /* 按钮之间的间隙 */
+            justify-content: center;
+            flex-wrap: nowrap;
+            align-items: center;
+            height: var(--menu-height);
+        }
+
+        #menu button {
+            padding: 10px 20px; /* 按钮内边距 */
+            border: none; /* 移除边框 */
+            border-radius: 5px; /* 轻微的圆角 */
+            color: white; /* 文字颜色 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+            transition: background-color 0.3s; /* 平滑的背景颜色过渡效果 */
+        }
+
+        #menu button:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #menu button:active {
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #undo {
+            background-color: #0000ff; /* 亮蓝色 */
+            color: white;
+        }
+
+        #clear {
+            background-color: #e74c3c; /* 亮红色 */
+            color: white;
+        }
+
+        #close {
+            background-color: #2ecc71; /* 亮绿色 */
+            color: white;
+        }
+
+        #canvas-wrapper {
+            height: calc(100vh - var(--menu-height) - 5px);
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            width: 100%; /* 适应整个视口的宽度 */
+        }
+
+        #image-container {
+            cursor: pointer;
+            border: 2px dashed #ccc;
+            padding: 10px;
+            width: 300px; /* 给定固定宽度 */
+            min-height: 200px; /* 给定最小高度以确保与 chat-box 一样高 */
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0; /* 防止在空间不足时缩小 */
+        }
+
+        .icon {
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            cursor: pointer;
+        }
+
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50%;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            z-index: 1050; /* 高于页面其他元素 */
+            display: none; /* 默认不显示，需要时通过JS控制显示 */
+        }
+
+        .modal-header {
+            padding: 10px;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #ebeef5;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            color: #303133;
+        }
+
+        .modal-close-btn {
+            float: right;
+            font-size: 20px;
+            border: none;
+            background-color: transparent;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+            font-size: 16px;
+            color: #606266;
+        }
+
+        .modal-footer {
+            padding: 10px;
+            text-align: right;
+            border-top: 1px solid #ebeef5;
+        }
+
+        .btn {
+            padding: 6px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .btn-default {
+            background-color: #dcdfe6;
+            color: #606266;
+        }
+
+        .btn-primary {
+            background-color: #409eff;
+            color: white;
+        }
+
+        /* 显示模态框时的样式 */
+        .modal-show {
+            display: block;
+        }
+
+
+        .chat-item {
+            background-color: #f9f9f9; /* 聊天项背景色 */
+            margin-bottom: 10px; /* 聊天项之间的间距 */
+            border-radius: 8px; /* 轻微的圆角 */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 轻微的阴影，增加立体感 */
+            padding: 15px; /* 内部间距 */
+            max-width: 70%; /* 聊天项的最大宽度 */
+            word-wrap: break-word; /* 防止内容溢出 */
+        }
+
+        .chat-item-content {
+            margin-bottom: 10px; /* 文本内容与图片之间的间距 */
+        }
+
+        .chat-image-wrapper img {
+            max-width: 300px; /* 图片的最大宽度 */
+            max-height: 270px; /* 图片的最大高度 */
+            height: auto; /* 保持图片原有比例 */
+            width: auto; /* 保持图片原有比例 */
+            border-radius: 4px; /* 图片轻微圆角 */
+            margin-right: 10px; /* 图片之间的间距 */
+        }
+
+        .chat-item-actions {
+            display: flex;
+            justify-content: flex-end; /* 删除图标靠右显示 */
+        }
+
+        .delete-icon {
+            font-size: 20px; /* 删除图标大小 */
+            color: #999; /* 图标颜色 */
+            padding: 5px; /* 方便点击 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+        }
+
+        .chat-item-user {
+            margin: 0 0 10px auto;
+        }
+
+        @keyframes stripeFlickerAnimation {
+            0%, 100% {
+                background-position: 0 0;
+            }
+            50% {
+                background-position: 0 50px; /* 调整这个值以改变动画的速度和方向 */
+            }
+        }
+
+        .chat-item-ai-loading {
+            /* 添加一些基本样式以便更好地显示效果 */
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            /* 定义条纹背景 */
+            background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.1) 75%, transparent 75%, transparent);
+            background-size: 40px 40px; /* 调整这个值以改变条纹的大小 */
+            /* 应用动画 */
+            animation: stripeFlickerAnimation 2s linear infinite forwards;
+        }
+
+
+        .delete-icon-chat {
+            font-size: 20px;
+            color: #ccc; /* 更加柔和的颜色，减少干扰 */
+            cursor: pointer;
+        }
+
+        #chat-input-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: #fff; /* 或者选择与你的UI设计相匹配的颜色 */
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 轻微的阴影效果 */
+        }
+
+        #chat-input-text {
+            flex-grow: 1;
+            margin-right: 10px; /* 与发送按钮之间的间距 */
+            padding: 8px 12px;
+            border: 1px solid #ccc; /* 轻微的边框 */
+            border-radius: 5px; /* 轻微的圆角 */
+            outline: none; /* 移除聚焦时的默认轮廓线 */
+            font-size: 24px; /* 适当的字体大小 */
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1); /* 内部阴影，增加深度感 */
+            transition: border-color 0.3s; /* 平滑的边框颜色过渡效果 */
+        }
+
+        #chat-input-text:focus {
+            border-color: #4A90E2; /* 聚焦时的边框颜色 */
+        }
+
+        #chat-input-btn {
+            padding: 8px 15px;
+            background-color: #4A90E2; /* 按钮背景颜色 */
+            color: #fff;
+            border: none;
+            border-radius: 5px; /* 按钮圆角 */
+            cursor: pointer; /* 鼠标悬停时的手形光标 */
+            transition: background-color 0.3s; /* 背景颜色过渡效果 */
+        }
+
+        #chat-input-btn:hover {
+            background-color: #357ABD; /* 鼠标悬停时的背景颜色 */
+        }
+
+        .chat-item-ai-error {
+            color: red;
+            font-weight: bold;
+        }
+
+        #imageOverlay {
+            position: fixed; /* 固定位置，全屏覆盖 */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); /* 半透明背景 */
+            display: flex;
+            align-items: center; /* 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            z-index: 1000; /* 确保在最上层 */
+        }
+
+        #imageOverlay img {
+            max-width: 80%; /* 最大宽度，确保不会超过屏幕 */
+            max-height: 80%; /* 最大高度，确保不会超过屏幕 */
+        }
+
+        .show-image {
+            cursor: pointer;
+        }
+
+        .show-image:hover {
+            opacity: 0.8;
+        }
+
+    </style>
+
+</head>
+<body>
+<input style="display: none;" type="file" id="upload" name="upload" accept="image/*"/>
+<div id="container">
+    <div id="container-header">
+        <div id="container-aside">
+            <div id="image-container">
+                <label class="upload-hint">拖放图片到此处</label>
+            </div>
+            <div id="image-wall">
+            </div>
+        </div>
+        <div id="container-main">
+            <div id="chat-box">
+                <div id="chat-content"></div>
+                <div id="chat-input-box">
+                    <div id="toolbar">
+                        <i class="icon icon-tool">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" data-v-ea893728="">
+                                <path fill="currentColor"
+                                      d="M764.416 254.72a351.68 351.68 0 0 1 86.336 149.184H960v192.064H850.752a351.68 351.68 0 0 1-86.336 149.312l54.72 94.72-166.272 96-54.592-94.72a352.64 352.64 0 0 1-172.48 0L371.136 936l-166.272-96 54.72-94.72a351.68 351.68 0 0 1-86.336-149.312H64v-192h109.248a351.68 351.68 0 0 1 86.336-149.312L204.8 160l166.208-96h.192l54.656 94.592a352.64 352.64 0 0 1 172.48 0L652.8 64h.128L819.2 160l-54.72 94.72zM704 499.968a192 192 0 1 0-384 0 192 192 0 0 0 384 0"></path>
+                            </svg>
+                        </i>
+                    </div>
+                    <div id="chat-input-wrapper">
+                        <label for="chat-input-text"></label>
+                        <textarea id="chat-input-text" placeholder="输入消息"></textarea>
+                        <button id="chat-input-btn">发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片放大覆盖层 -->
+    <div id="imageOverlay" style="display:none;" onclick="closeOverlay();">
+        <img id="overlayImage" src="" alt="Expanded image">
+    </div>
+</div>
+
+<div id="modal" class="modal">
+    <div class="modal-header">
+        <span class="modal-title">使用设置</span>
+        <button class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+        <table>
+            <tr>
+                <td>
+                    <label for="openAIToken">Open AI Access token：</label>
+                </td>
+                <td>
+                    <input size="50" type="text" id="openAIToken" placeholder="输入Open AI的Access token">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="apiBaseUrl">API Base Url：</label>
+                </td>
+                <td>
+                    <input size="50" type="text" id="apiBaseUrl" placeholder="输入API Base Url">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="dallModel">DALL-E模型：</label>
+                </td>
+                <td>
+                    <select id="dallModel">
+                        <option value="dall-e-2" selected>dall-e-2</option>
+                        <option value="dall-e-3">dall-e-3</option>
+                    </select>
+                </td>
+            </tr>
+            <tr id="imageQualityRow">
+                <td>
+                    <label for="imageQuality">图片质量：</label>
+                </td>
+                <td>
+                    <select id="imageQuality">
+                        <option value="standard" selected>standard</option>
+                        <option value="hd">hd</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label>构造图片大小</label>
+                </td>
+                <td>
+                    <select id="dall-e-2-size">
+                        <option value="256x256">256x256</option>
+                        <option value="512x512">512x512</option>
+                        <option value="1024x1024" selected>1024x1024</option>
+                    </select>
+                    <select id="dall-e-3-size" style="display:none;">
+                        <option value="1024x1024" selected>1024x1024</option>
+                        <option value="1792x1024">1792x1024</option>
+                        <option value="1024x1792">1024x1792</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="modal-footer">
+        <button id="close-modal-btn" class="btn btn-default">取消</button>
+        <button id="save-modal-btn" class="btn btn-primary">保存</button>
+    </div>
+</div>
+
+<div id="canvas-container">
+    <div id="canvas-header">
+        <div id="menu">
+            <button id="undo">回退</button>
+            <button id="clear">清除</button>
+            <button id="close">关闭</button>
+            <i class="icon icon-tool">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" data-v-ea893728="">
+                    <path fill="currentColor"
+                          d="m199.04 672.64 193.984 112 224-387.968-193.92-112-224 388.032zm-23.872 60.16 32.896 148.288 144.896-45.696zM455.04 229.248l193.92 112 56.704-98.112-193.984-112-56.64 98.112zM104.32 708.8l384-665.024 304.768 175.936L409.152 884.8h.064l-248.448 78.336zm384 254.272v-64h448v64h-448z"></path>
+                </svg>
+            </i>
+            <input type="range" id="brush-size" min="1" max="100" value="50" step="1">
+        </div>
+    </div>
+    <div id="canvas-wrapper">
+        <canvas id="backgroundCanvas"></canvas>
+        <canvas id="drawingCanvas"></canvas>
+    </div>
+</div>
+<script>
+
+    const defaultAPIBaseUrl = 'https://api.oaifree.com/v1';
+    const defaultDallModel = 'dall-e-2';
+    const defaultImageQuality = 'standard';
+    const defaultDallE2Size = '1024x1024';
+    const defaultDallE3Size = '1024x1792';
+
+    /**
+     * 初始化参数
+     */
+    function initParams() {
+        $('#openAIToken').val(getLocalStorage('openAIToken') || '');
+        $('#apiBaseUrl').val(getLocalStorage('apiBaseUrl') || defaultAPIBaseUrl);
+        $('#dallModel').val(getLocalStorage('dallModel') || defaultDallModel);
+        $('#imageQuality').val(getLocalStorage('imageQuality') || defaultImageQuality);
+        $('#dall-e-2-size').val(getLocalStorage('dallE2Size') || defaultDallE2Size);
+        $('#dall-e-3-size').val(getLocalStorage('dallE3Size') || defaultDallE3Size);
+        if ($('#dallModel').val() === 'dall-e-3') {
+            $('#dall-e-3-size').show();
+            $('#dall-e-2-size').hide();
+        } else {
+            $('#dall-e-3-size').hide();
+            $('#dall-e-2-size').show();
+        }
+    }
+
+    // 图片索引
+    let imgIndex = 0;
+    $(() => {
+        // 初始化参数
+        initParams();
+        // #region 设置 配置参数时间 -------
+        $('#dallModel').on('change', function () {
+            if ($(this).val() === 'dall-e-3') {
+                $('#dall-e-3-size').show();
+                $('#dall-e-2-size').hide();
+            } else {
+                $('#dall-e-3-size').hide();
+                $('#dall-e-2-size').show();
+            }
+            setLocalStorage('dallModel', $(this).val());
+        });
+        $('#imageQuality').on('change', function () {
+            setLocalStorage('imageQuality', $(this).val());
+        });
+        $('#dall-e-2-size').on('change', function () {
+            setLocalStorage('dallE2Size', $(this).val());
+        })
+
+        $('#dall-e-3-size').on('change', function () {
+            setLocalStorage('dallE3Size', $(this).val());
+        });
+        // 隐藏模态框
+        $('.modal-close-btn, #close-modal-btn').on('click', hideModal);
+        // 显示模态框
+        $('.icon-tool').on('click', showModal);
+        // 保存设置
+        $('#save-modal-btn').on('click', function () {
+            const apiBaseUrl = $('#apiBaseUrl');
+            const replaceUrl = apiBaseUrl.val().replace(/\/+$/, '');
+            apiBaseUrl.val(replaceUrl);
+            setLocalStorage('openAIToken', $('#openAIToken').val());
+            setLocalStorage('apiBaseUrl', replaceUrl);
+            hideModal();
+        });
+        // #endregion 设置 配置参数时间 -------
+
+        // #region 图片拖拽事件 -------
+        const $imgContainer = $('#image-container');
+        // 阻止默认的拖放事件行为
+        $imgContainer.on('dragenter dragover dragleave drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        // 高亮显示容器
+        $imgContainer.on('dragenter dragover', function (e) {
+            $imgContainer.addClass('over');
+        });
+
+        // 取消高亮显示容器
+        $imgContainer.on('dragleave drop', function (e) {
+            $imgContainer.removeClass('over');
+        });
+
+        // 处理文件拖放
+        $imgContainer.on('drop', function (e) {
+            const files = e.originalEvent.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        $('#container-aside').on('drop', function (e) {
+            const imgId = e.originalEvent.dataTransfer.getData('text');
+            const imageUrl = $('#' + imgId).attr('src');
+            addImageToWall(imageUrl, 'dall-img.jpg');
+        });
+
+        /**
+         * 处理文件上传
+         * @param files 文件列表
+         */
+        function handleFiles(files) {
+            $.each(files, function (i, file) {
+                displayImage(file);
+            });
+        }
+
+        /**
+         * 显示图片
+         * @param file 文件对象
+         */
+        function displayImage(file) {
+            if (!file.type.startsWith('image/')) {
+                return;
+            }
+            // 限制图片大小为 4M
+            if (file.size > 4 * 1024 * 1024) {
+                alert('图片大小不能超过 4M');
+                return;
+            }
+            let reader = new FileReader();
+            reader.onloadend = function () {
+                addImageToWall(reader.result, file.name);
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // 添加图片上传事件
+        $('#upload').on('change', () => {
+            let files = $('#upload')[0].files;
+            handleFiles(files);
+        });
+        // 图片上传事件
+        $('#image-container').on('click', function () {
+            $('#upload').click();
+        });
+        // 图片删除事件
+        $('body').on('click', '.delete-icon', function () {
+            if (confirm('确认删除这张图片吗？')) {
+                const imgId = $(this).closest('.image-item .delete-icon').attr('data-img-id');
+                $(this).closest('.image-item').remove();
+                history[imgId] = []; // 清除历史记录
+                _imgList[imgId] = []; // 清除图片数据
+                scaleImgList[imgId] = []; // 清除缩放后的图片数据
+            }
+        });
+        // 聊天消息删除事件
+        $('body').on('click', '.delete-icon-chat', function () {
+            if (confirm('确认删除这条消息吗？')) {
+                $(this).closest('.chat-item').remove();
+            }
+        });
+
+        // 图片点击事件
+        $('body').on('click', '.image-item-content img', function (event) {
+            const container = document.getElementById('canvas-container');
+            container.style.display = 'flex';
+            addShortKey();
+            drawImage(event.target);
+        });
+        // 添加撤回按钮事件
+        $('#undo').on('click', function () {
+            undo(drawingCanvas, drawingCtx);
+        });
+        // 添加清除按钮事件
+        $('#clear').on('click', function () {
+                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                saveHistory(drawingCanvas); // 保存当前状态
+            }
+        );
+        // 关闭画布
+        $('#close').on('click', hideCanvas);
+
+        // 允许 #chat-input-wrapper 接收拖拽
+        $('#chat-box').on('dragover', function (event) {
+            event.preventDefault(); // 阻止默认行为，允许放置
+        }).on('drop', function (event) {
+            // 清空输入框中的图片
+            $('#source-img, #mask-img').remove();
+            event.preventDefault(); // 阻止默认的处理方式（打开作为链接）
+            // 获取拖拽的图片 ID，并根据 ID 从 _imgList 和 history 中获取数据
+            const imgId = event.originalEvent.dataTransfer.getData('text');
+            const imageScaleList = scaleImgList[imgId];
+            const imgHistory = history[imgId];
+            if (imageScaleList) {
+                const imageUrl = imageScaleList[imageScaleList.length - 1];
+                // 在这里处理图片，例如添加到聊天输入或显示预览
+                $('#chat-input-wrapper').append(`<img id="source-img" src="${imageUrl}" style="max-width: 50px; max-height: 50px;" />`);
+            }
+            if (imgHistory?.length > 0) {
+                const maskImageUrl = imgHistory[imgHistory.length - 1];
+                $('#chat-input-wrapper').append(`<img id="mask-img" src="${maskImageUrl}" style="max-width: 50px; max-height: 50px;" />`);
+            }
+        });
+
+        $('#chat-input-btn').on('click', () => {
+            if (!$('#chat-input-text').val()) {
+                alert('请输入消息内容');
+                return;
+            }
+            if ($('#source-img, #mask-img').length) {
+                $('#chat-input-btn').attr('disabled', true);
+                callOpenAIEditAPI();
+            } else {
+                callOpenAIGenerateAPI();
+            }
+        });
+        // #endregion 图片拖拽事件 -------
+    });
+
+    /**
+     *  添加图片到图片墙
+     * @param src 图片地址
+     * @param name 图片名称
+     */
+    function addImageToWall(src, name) {
+        const imgTemplate = `
+                        <div class="image-item">
+                            <div class="image-item-actions">
+                                <span data-img-id="img-${imgIndex}" class="delete-icon" style="cursor: pointer;">&times;</span>
+                            </div>
+                            <div class="image-item-content">
+                                <img src="${src}" alt="${name}" id="img-${imgIndex++}">
+                            </div>
+                         </div>
+                    `;
+        $('#image-wall').append(imgTemplate);
+        // 保存图片数据
+        _imgList['img-' + (imgIndex - 1)] = (src);
+        // 设置 .image-item-content 中的 img 为可拖拽
+        $('.image-item-content img').attr('draggable', true).on('dragstart', function (event) {
+            // 在拖动开始时，将图片的 src 存储在 dataTransfer 对象中
+            event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
+        });
+    }
+
+    /**
+     *  清除聊天消息
+     */
+    function clearChatMessageSendArea() {
+        // 清空输入框中的图片
+        $('#source-img, #mask-img').remove();
+        $('#chat-input-text').val('');
+    }
+
+    /**
+     *  获取图片的Blob数据
+     * @param url 图片地址
+     * @param fillColor 背景颜色 (可选)
+     * @returns {Promise<Blob>}
+     */
+    async function getImageBlob(url, fillColor = null) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // 如果图片来源于不同的域，尝试设置此属性
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                const scaleX = 1024 / img.width;
+                const scaleY = 1792 / img.height;
+                // 应用缩放比例到宽度和高度来保持宽高比
+                canvas.width = 1024;
+                canvas.height = 1792;
+                // 绘制图片到临时canvas
+                const ctx = canvas.getContext('2d');
+                // 首先，在临时canvas上绘制一个白色背景
+                if (fillColor) {
+                    ctx.fillStyle = '#fff'; // 白色填充
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                const scaleToFit = Math.min(scaleX, scaleY);
+                // 计算图片绘制的尺寸
+                const imageWidth = img.width * scaleToFit;
+                const imageHeight = img.height * scaleToFit;
+                // 计算绘制的起始点，以使图片居中
+                const offsetX = (canvas.width - imageWidth) / 2;
+                const offsetY = (canvas.height - imageHeight) / 2;
+                // 绘制图片
+                ctx.drawImage(img, offsetX, offsetY, imageWidth, imageHeight);
+                // // 检查是否需要旋转（宽度大于高度）
+                // const needRotate = img.width > img.height;
+                // if (needRotate) {
+                //     // 将绘制的原点移动到新的中心点
+                //     ctx.translate(canvas.width / 2, canvas.height / 2);
+                //     // 旋转画布
+                //     ctx.rotate(Math.PI / 2); // 旋转90度（π/2弧度）
+                //     // 绘制图片，由于画布已经旋转并且原点也改变了，需要调整图片的位置
+                //     ctx.drawImage(img, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+                // } else {
+                //     // 在调整后的canvas尺寸上绘制图片
+                //     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // }
+                canvas.toBlob(resolve);
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    /**
+     * 发送消息到 OpenAI API 进行编辑
+     * @returns {Promise<void>}
+     */
+    async function callOpenAIEditAPI() {
+        const formData = new FormData();
+        const sourceUrl = $('#source-img')?.attr('src');
+        if (!sourceUrl) {
+            alert('请先选择一张图片');
+            return;
+        }
+        const maskUrl = $('#mask-img')?.attr('src');
+
+        // 使用 Promise.all 同步获取图片Blob
+        Promise.all([
+            sourceUrl ? getImageBlob(sourceUrl).then(blob => ({
+                blob: blob,
+                name: 'image',
+                type: sourceUrl.split('.').pop()
+            })) : Promise.resolve(null), // 如果没有 sourceUrl，返回一个解决为null的Promise
+            maskUrl ? getImageBlob(maskUrl, '#fff').then(blob => ({
+                blob: blob,
+                name: 'mask',
+                type: maskUrl.split('.').pop()
+            })) : Promise.resolve(null)
+        ]).then(results => {
+            // 过滤掉任何可能的null结果，并处理每个成功的Blob获取
+            results.forEach(result => {
+                if (result) {
+                    formData.append(result.name, result.blob, `${result.name}.${result.type}`);
+                }
+            });
+            // 继续处理 formData
+            formData.append('prompt', $('#chat-input-text').val());
+            formData.append('n', 1);
+            formData.append('size', '1024x1024');
+            addUserChatMessage(formData);
+            clearChatMessageSendArea();
+            // TODO 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+            // TODO 需要抽离出来
+            fetch($('#apiBaseUrl').val() + '/images/edits', {
+                method: 'POST',
+                headers: {
+                    // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+                    'Authorization': 'Bearer ' + $('#openAIToken').val(),
+                },
+                body: formData
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('OpenAI API 请求失败:', response);
+                    return Promise.reject(response.json());
+                }
+                return response.json();
+            }).then(data =>
+                addDallChatMessage(data)
+            ).catch(error => {
+                console.error('OpenAI API 请求失败:', error);
+                error.then(data => {
+                    addErrorMessage(data);
+                });
+            }).finally(() => $('#chat-input-btn').attr('disabled', false));
+            // 这里插入发送 formData 到服务器的代码
+            // 例如： uploadData(formData);
+        }).catch(error => {
+            console.error('获取图像失败:', error);
+            $('#chat-input-btn').attr('disabled', false);
+        })
+    }
+
+    function callOpenAIGenerateAPI() {
+        $('#chat-input-btn').attr('disabled', true);
+        const prompt = $('#chat-input-text').val();
+
+        const size = $('#dallModel').val() === 'dall-e-2' ? $('#dall-e-2-size').val() : $('#dall-e-3-size').val();
+        const data = {
+            prompt: prompt,
+            n: 1,
+            size: size,
+            quality: $('#imageQuality').val(),
+            model: $('#dallModel').val()
+        }
+        addUserChatMessage(data);
+        fetch($('#apiBaseUrl').val() + '/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // 替换 YOUR_OPENAI_API_KEY 为你的 OpenAI API 密钥
+                'Authorization': 'Bearer ' + $('#openAIToken').val(),
+            },
+            body: JSON.stringify(data)
+        }).then(response => {
+            if (!response.ok) {
+                console.error('OpenAI API 请求失败:', response);
+                return Promise.reject(response.json());
+            }
+            return response.json();
+        }).then(data => addDallChatMessage(data)).catch(error => {
+            error.then(data => {
+                addErrorMessage(data);
+            });
+        }).finally(() => $('#chat-input-btn').attr('disabled', false));
+    }
+
+    function scrollToBottom(selector) {
+        $(selector).animate({scrollTop: $(selector)[0].scrollHeight}, 'slow');
+
+    }
+
+    function addUserChatMessage(formData) {
+        const content = $('#chat-content');
+        const message = `
+                <div class="chat-item chat-item-user">
+                    <div class="chat-item-ai-content">You:</div>
+                    <div class="chat-item-content">${formData.get ? formData.get('prompt') : formData.prompt}</div>
+                        <div class="chat-image-wrapper">
+                            ${formData.getAll ? formData.getAll('image').map(img => `<img class="chat-item-content show-image" src="${img.name.replace('image.', '')}" alt="image">`).join('') : ''}
+                            ${formData.getAll ? formData.getAll('mask').map(img => `<img class="chat-item-content  show-image" src="${img.name.replace('mask.', '')}" alt="image">`).join('') : ''}
+                        </div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-item chat-item-ai chat-item-ai-loading">
+                    <div class="chat-item-ai-content">DALL:</div>
+                    <div class="chat-item-content">正在生成...</div>
+                    <div class="chat-item-actions">
+                        <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
+                    </div>
+                </div>
+            `;
+        content.append(message);
+        scrollToBottom('#chat-content');
+    }
+
+    function addDallChatMessage(data) {
+        const imageUrl = data.data[0].url;
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // 这是关键，允许跨域访问
+        img.onload = function () {
+            // 创建canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            // 将图片绘制到canvas上
+            ctx.drawImage(img, 0, 0);
+            // 将canvas内容转换为Base64
+            const imageUrl = canvas.toDataURL(img.type);
+            // 显示生成的图片
+            const content = $('#chat-content .chat-item-ai-loading');
+            const message = `
+                        <div class="chat-item-ai-content">DALL:</div>
+                        <div class="chat-item-content">${data.data[0].revised_prompt}</div>
+                        <div class="chat-image-wrapper">
+                            <img class="chat-item-content show-image" src="${imageUrl}" id="dall-image-${imgIndex++}" alt="image" data-width="${img.width}" data-height="${img.height}" />
+                        </div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
+                        </div>
+                    `;
+
+            content.html(message);
+            content.removeClass('chat-item-ai-loading');
+
+            // 设置 .image-item-content 中的 img 为可拖拽
+            content.find('.chat-item-content img').attr('draggable', true).on('dragstart', function (event) {
+                // 在拖动开始时，将图片的 id 存储在 dataTransfer 对象中
+                event.originalEvent.dataTransfer.setData('text', this.id); // 存储图片的 id
+            });
+            scrollToBottom('#chat-content');
+        }
+        img.src = imageUrl;
+    }
+
+    function addErrorMessage(error) {
+        const content = $('#chat-content .chat-item-ai-loading');
+        const errorMessage = `
+                        <div class="chat-item-ai-content">DALL:</div>
+                        <div class="chat-item-content">${error.error.message}</div>
+                        <div class="chat-item-actions">
+                            <span class="delete-icon-chat" style="cursor: pointer;">&times;</span>
+                        </div>
+                `;
+        content.html(errorMessage);
+        content.removeClass('chat-item-ai-loading');
+        content.addClass('chat-item-ai-error');
+        scrollToBottom('#chat-content');
+        console.error('Request failed', data);
+    }
+
+    function setLocalStorage(key, value) {
+        localStorage.setItem(key, value);
+    }
+
+    function getLocalStorage(key) {
+        return localStorage.getItem(key);
+    }
+
+    // 显示模态框函数
+    function showModal() {
+        document.getElementById('modal').style.display = 'block';
+    }
+
+    // 隐藏模态框函数
+    function hideModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    /**
+     * 添加快捷键监听
+     */
+    function addShortKey() {
+        document.addEventListener('keydown', (event) => {
+            // 检查是否按下了Ctrl键和Z键
+            if (event.ctrlKey && event.key === 'z') {
+                event.preventDefault(); // 阻止默认操作，比如浏览器的撤销
+                undo(drawingCanvas, drawingCtx); // 调用撤销函数
+            } else if (event.key === "Escape") {
+                event.preventDefault(); // 如果需要，也可以阻止Esc键的默认行为
+                hideCanvas(); // 调用关闭函数
+            }
+        });
+    }
+
+
+    /**
+     * 隐藏画布
+     */
+    function hideCanvas() {
+        const container = document.getElementById('canvas-container');
+        container.style.display = 'none';
+        const currentHistory = history[currentImgId];
+        // 合并两张照片
+        mergeImages(currentHistory[currentHistory.length - 1], currentImgId);
+        removeShortKey();
+    }
+
+    /**
+     * 合并图片和遮罩
+     * @param maskUrl 遮罩图片的URL
+     * @param imgId 图片的ID
+     */
+    function mergeImages(maskUrl, imgId) {
+        const backgroundImg = new Image();
+        backgroundImg.onload = function () {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = backgroundImg.width;
+            canvas.height = backgroundImg.height;
+            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+            // 如果没有则恢复到初始状态
+            if (maskUrl) {
+                const maskImg = new Image();
+                maskImg.onload = function () {
+                    ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+                    document.getElementById(imgId).src = canvas.toDataURL('image/png');
+                };
+                maskImg.src = maskUrl;
+            } else {
+                document.getElementById(imgId).src = canvas.toDataURL('image/png');
+            }
+        };
+        backgroundImg.src = _imgList[imgId];
+    }
+
+    /**
+     * 移除快捷键监听
+     */
+    function removeShortKey() {
+        document.removeEventListener('keydown', null);
+    }
+
+    const backgroundCanvas = document.getElementById('backgroundCanvas');
+    const drawingCanvas = document.getElementById('drawingCanvas');
+    const backgroundCtx = backgroundCanvas.getContext('2d');
+    const drawingCtx = drawingCanvas.getContext('2d');
+    let isDrawing = false;
+    const history = []; // 存储画布历史的数组
+    const scaleImgList = [] // 存储缩放后的图片的数组
+    const _imgList = []; // 存储图片的数组
+    let currentImgId = ''; // 当前正在编辑的图片
+
+    /**
+     * 保存当前画板状态到历史记录
+     * @param canvas 画板
+     * @param items 历史记录数组
+     */
+    function saveHistory(canvas, items = history) {
+        let currentHistory = items[currentImgId];
+        if (!currentHistory) {
+            items[currentImgId] = [];
+            currentHistory = items[currentImgId];
+        } else if (currentHistory.length > 30) { // 限制历史记录的大小
+            currentHistory.shift(); // 移除最旧的记录
+        }
+        currentHistory.push(canvas.toDataURL()); // 保存当前状态
+    }
+
+    /**
+     * 撤销上一步操作
+     * @param canvas 画板
+     * @param ctx 画板上下文
+     */
+    function undo(canvas, ctx) {
+        const currentHistory = history[currentImgId] || [];
+        if (currentHistory.length === 0) {
+            return; // 没有历史记录可供撤销
+        }
+        currentHistory.pop(); // 移除当前状态
+        let lastState = currentHistory[currentHistory.length - 1];
+        drawMask(lastState, canvas, ctx); // 绘制上一状态
+    }
+
+    /**
+     * 绘制遮罩
+     * @param source 遮罩图片的URL
+     * @param canvas 画板
+     * @param ctx 画板上下文
+     */
+    function drawMask(source, canvas, ctx) {
+        let img = new Image();
+        img.onload = function () {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 清除当前画布
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // 绘制上一状态
+        };
+        if (source) {
+            img.src = source;
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 如果没有上一状态，清除画布
+        }
+
+    }
+
+    /**
+     * 获取缩放比例
+     * @param img 图片
+     * @returns {{scaleX: number, scaleY: number}} 缩放比例
+     */
+    function getScale(img, width, height, getMax = false) {
+        // 获取window的宽高
+        const windowWidth = width || window.innerWidth * 0.85;
+        const windowHeight = height || window.innerHeight * 0.85;
+        // 计算缩放比例
+        const scaleX = windowWidth / img.width;
+        const scaleY = windowHeight / img.height;
+        const scale = getMax ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
+        return {scaleX: scale, scaleY: scale}
+    }
+
+    /**
+     * 绘制图片
+     * @param targetImg 图片对象
+     */
+    function drawImage(targetImg) {
+        const img = new Image();
+        img.onload = function () {
+            const {scaleX, scaleY} = getScale(img);
+            const scaleWidth = img.width * scaleX;
+            const scaleHeight = img.height * scaleY;
+            // 调整画布大小
+            initializeCanvas(scaleWidth, scaleHeight); // 假设这个函数设置了画布的大小
+            // 进行缩放
+            backgroundCtx.drawImage(img, 0, 0, scaleWidth, scaleHeight); // 使用缩放后的尺寸绘制图像
+            // 保存缩放后的图片
+            saveHistory(backgroundCanvas, scaleImgList);
+            // 绘制遮罩
+            // 如果有历史记录，则恢复到最后一次状态
+            const currentHistory = history[currentImgId];
+            const lastState = currentHistory[currentHistory.length - 1];
+            drawMask(lastState, drawingCanvas, drawingCtx);
+        };
+        currentImgId = targetImg.id;
+        img.src = _imgList[currentImgId];
+        if (!history[currentImgId]) {
+            history[currentImgId] = [];
+        }
+    }
+
+    /**
+     * 初始化画布
+     * @param width 画布宽度
+     * @param height 画布高度
+     */
+    function initializeCanvas(width, height) {
+        backgroundCanvas.width = width;
+        backgroundCanvas.height = height;
+        drawingCanvas.width = width;
+        drawingCanvas.height = height;
+    }
+
+    /**
+     * 开始绘制
+     * @param e 鼠标事件
+     */
+    function startDrawing(e) {
+        isDrawing = true;
+        draw(e); // 开始绘制
+    }
+
+    /**
+     * 绘制
+     * @param e 鼠标事件
+     */
+    function draw(e) {
+        if (!isDrawing) return;
+        const rect = drawingCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        drawingCtx.lineWidth = $('#brush-size').val(); // 笔触大小
+        drawingCtx.lineCap = 'round';
+        drawingCtx.strokeStyle = 'rgba(0,0,0,0.5)'; // 灰色半透明
+
+        drawingCtx.lineTo(x, y);
+        drawingCtx.stroke();
+        drawingCtx.beginPath();
+        drawingCtx.moveTo(x, y);
+        saveHistory(drawingCanvas);
+    }
+
+    /**
+     * 停止绘制
+     */
+    function stopDrawing() {
+        isDrawing = false;
+        drawingCtx.beginPath();
+    }
+
+    function exportMask() {
+        // 创建一个新的临时canvas，用于导出
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = drawingCanvas.width;
+        tempCanvas.height = drawingCanvas.height;
+
+        // 首先，在临时canvas上绘制一个白色背景
+        tempCtx.fillStyle = '#ffffff'; // 白色填充
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // 然后，将drawingCanvas的内容绘制在白色背景上
+        tempCtx.drawImage(drawingCanvas, 0, 0);
+
+        // 导出临时canvas的内容（现在有了白色背景的遮罩）
+        const link = document.createElement('a');
+        link.download = 'mask.png';
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+    }
+
+    // 设置画笔大小
+    function updateBrushSize() {
+        const brushSize = $('#brush-size').val();
+        // 计算圆的半径，可以根据实际需要调整公式
+        let radius = brushSize / 2;
+        // 应用新光标样式
+        drawingCanvas.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${brushSize}" height="${brushSize}" viewport="0 0 ${brushSize} ${brushSize}" style="fill:black;font-size:24px;"><circle cx="${radius}" cy="${radius}" r="${radius - 1}" stroke="black" stroke-width="2" fill="none" /></svg>') ${radius} ${radius}, auto`;
+    }
+
+    $('#brush-size').on('input', updateBrushSize);
+
+    drawingCanvas.addEventListener('mousedown', startDrawing);
+    drawingCanvas.addEventListener('mousemove', draw);
+    drawingCanvas.addEventListener('mouseup', stopDrawing);
+    drawingCanvas.addEventListener('mouseout', stopDrawing);
+    updateBrushSize(); // 初始化光标样式
+
+    function expandImage(imgElement) {
+        const overlay = $('#imageOverlay');
+        const overlayImg = $('#overlayImage');
+        overlay.css('display', 'flex'); // 显示覆盖层
+        overlayImg.attr('src', imgElement.src); // 设置覆盖层中图片的源为被点击图片的源
+
+    }
+
+    function closeOverlay() {
+        $('#imageOverlay').hide(); // 隐藏覆盖层
+    }
+
+    // 图片点击事件
+    $('body').on('click', '.chat-image-wrapper .show-image', function (event) {
+        event.stopPropagation(); // 阻止事件冒泡
+        expandImage(event.target); // 显示覆盖层
+    });
+
+
+</script>
+</body>
+</html>
